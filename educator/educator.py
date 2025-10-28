@@ -4,6 +4,10 @@ from fastapi.responses import JSONResponse
 import uvicorn
 import pinggy
 from contextlib import asynccontextmanager
+from asyncio import Lock
+import time
+import os
+from fastapi.responses import FileResponse
 
 
 TOKEN = "" # Will be set in init()
@@ -21,14 +25,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-
-
-# Simulated student database (map IPs to student names)
-STUDENTS = {
-    "127.0.0.1": "Alex",
-    # later you can add other IPs like:
-    # "192.168.0.15": "John",
-}
+predictions_log = []
+predictions_lock = Lock()
 
 
 def init():
@@ -55,26 +53,35 @@ async def receive_emotions(request: Request):
     try:
         data = await request.json()
         client_ip = request.client.host
-        student_name = STUDENTS.get(client_ip, "Unknown student")
+        timestamp = int(time.time())
 
-        # Print info
-        print(f"\n📩 Received emotions from {student_name} ({client_ip})")
-        for emotion, value in data.items():
-            print(f"   {emotion:<10}: {value:.3f}")
-        print("-" * 40)
-
+        async with predictions_lock:
+            predictions_log.append((client_ip, timestamp, data))
+        
+        print(f"Received data from {client_ip} at {timestamp}: {data}")
+            
         return JSONResponse(
-            {"status": "ok", "student": student_name, "received": data},
+            {"status": "ok"},
             status_code=200,
         )
+        
     except Exception as e:
         print("Error:", e)
         return JSONResponse({"error": str(e)}, status_code=400)
 
 
+@app.get("/health")
+async def health_check():
+    return {"message": "ok"}
+
+
 @app.get("/")
-def root():
-    return {"message": "Emotion receiver server running"}
+async def root():
+    path = os.path.join(os.path.dirname(__file__), "index.html")
+    if not os.path.exists(path):
+        return JSONResponse({"error": "index.html not found"}, status_code=404)
+    return FileResponse(path, media_type="text/html")
+
 
 if __name__ == "__main__":
     init()
