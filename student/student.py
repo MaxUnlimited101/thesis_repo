@@ -1,4 +1,3 @@
-# app.py
 import cv2
 import torch
 import torch.nn.functional as F
@@ -23,7 +22,7 @@ CLASS_NAMES = ["anger","disgust","fear","happy","neutral","sad","surprise","cont
 model = models.resnet50(pretrained=False)
 model.fc = nn.Linear(model.fc.in_features, 8)  # 8 emotion classes
 # now load weights
-state_dict = torch.load("joint8_oversampled_best.pt", map_location="cpu")
+state_dict = torch.load("joint8_oversampled_best.pt", map_location="cpu")['model']
 model.load_state_dict(state_dict)
 model.eval()
 # Preprocessing
