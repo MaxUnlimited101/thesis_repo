@@ -52,13 +52,12 @@ def setup_tunnel(token):
 async def receive_emotions(request: Request):
     try:
         data = await request.json()
-        client_ip = request.client.host
         timestamp = int(time.time())
 
         async with predictions_lock:
-            predictions_log.append((client_ip, timestamp, data))
+            predictions_log.append((data['id'], timestamp, data['predictions']))
         
-        print(f"Received data from {client_ip} at {timestamp}: {data}")
+        print(f"Received data from {data['id']} at {timestamp}: {data['predictions']}")
             
         return JSONResponse(
             {"status": "ok"},

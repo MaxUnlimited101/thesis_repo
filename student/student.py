@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import requests
 import time
 from urllib.parse import urljoin
+import uuid
 
 
 # ---------------- CONFIG ----------------
@@ -78,6 +79,7 @@ def main():
     print("Press Ctrl+C to stop")
     
     try:
+        GUID = uuid.uuid4()
         while True:
             ret, frame = cap.read()
             if not ret:
@@ -86,7 +88,11 @@ def main():
             
             preds = predict(frame, model, device)
             print(f"Predictions: {preds}")
-            send_to_server(preds)
+            data = {
+                "id": str(GUID),
+                "predictions": preds
+            }
+            send_to_server(data)
             
             time.sleep(CAPTURE_INTERVAL)
     
