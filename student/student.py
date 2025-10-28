@@ -1,67 +1,101 @@
 import cv2
 import torch
 import torch.nn.functional as F
-import numpy as np
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from threading import Thread
 import requests
-import torch.nn as nn
-from torchvision import models
 import time
+from urllib.parse import urljoin
 
-app = FastAPI()
 
 # ---------------- CONFIG ----------------
-MODEL_PATH = "joint8_oversampled_best.pt"
-ENDPOINT_URL = "http://localhost:8001/api/emotions"
+MODEL_PATH = "model_efb0.pth"
+ENDPOINT_URL = ""
 CAPTURE_INTERVAL = 5  # seconds
-CLASS_NAMES = ["anger","disgust","fear","happy","neutral","sad","surprise","contempt"]
+# sasha's model
+#CLASS_NAMES = ("anger","disgust","fear","happy","neutral","sad","surprise","contempt")
+# max's model
+CLASS_NAMES = ('angry', 'disgust', 'contempt', 'fear', 'happy', 'neutral', 
+            'sad', 'surprise')
 # ----------------------------------------
 
-model = models.resnet50(pretrained=False)
-model.fc = nn.Linear(model.fc.in_features, 8)  # 8 emotion classes
-# now load weights
-state_dict = torch.load("joint8_oversampled_best.pt", map_location="cpu")['model']
-model.load_state_dict(state_dict)
-model.eval()
+
+def init():
+    # ask for endpoint URL
+    global ENDPOINT_URL
+    ENDPOINT_URL = input("Enter the Educator server URL (e.g., http://localhost:8001/): ").strip()
+    
+    device = 'cpu'
+    if torch.cuda.is_available():
+        device = 'cuda'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    print(f"Using device: {device}")
+    
+    model = torch.load(MODEL_PATH, weights_only=False, map_location=device)
+    model = model.to(device)
+    model.eval()
+    return model, device
+
+
 # Preprocessing
-def preprocess(frame):
+def preprocess(frame, device='cpu'):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame = cv2.resize(frame, (224, 224))
     tensor = torch.from_numpy(frame).permute(2, 0, 1).float() / 255.0
     tensor = tensor.unsqueeze(0)
-    return tensor
+    return tensor.to(device)
 
-def predict(frame):
+
+def predict(frame, model, device='cpu'):
+    model = model.to(device)
+    model.eval()
     with torch.no_grad():
-        inputs = preprocess(frame)
+        inputs = preprocess(frame, device)
         outputs = model(inputs)
         probs = F.softmax(outputs, dim=1).cpu().numpy()[0]
         return {CLASS_NAMES[i]: float(probs[i]) for i in range(len(CLASS_NAMES))}
 
+
 def send_to_server(data):
     try:
-        r = requests.post(ENDPOINT_URL, json=data, timeout=5)
-        print("Sent:", r.status_code)
+        r = requests.post(urljoin(ENDPOINT_URL, "api/emotions"), json=data, timeout=5)
+        print(f"Sent: {r.status_code}")
     except Exception as e:
-        print("Error sending:", e)
+        print(f"Error sending: {e}")
 
-def camera_loop():
+
+def main():
+    print("Initializing model...")
+    model, device = init()
+    
+    print(f"Opening camera...")
     cap = cv2.VideoCapture(0)
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            continue
-        preds = predict(frame)
-        print(preds)
-        send_to_server(preds)
-        time.sleep(CAPTURE_INTERVAL)
+    
+    if not cap.isOpened():
+        print("Error: Could not open camera")
+        return
+    
+    print(f"Camera running. Sending predictions every {CAPTURE_INTERVAL}s to {ENDPOINT_URL}")
+    print("Press Ctrl+C to stop")
+    
+    try:
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                print("Warning: Could not read frame")
+                continue
+            
+            preds = predict(frame, model, device)
+            print(f"Predictions: {preds}")
+            send_to_server(preds)
+            
+            time.sleep(CAPTURE_INTERVAL)
+    
+    except KeyboardInterrupt:
+        print("\nStopping...")
+    finally:
+        cap.release()
+        print("Camera released. Goodbye!")
 
-@app.on_event("startup")
-def startup_event():
-    Thread(target=camera_loop, daemon=True).start()
 
-@app.get("/")
-def root():
-    return {"status": "camera running", "sending every": f"{CAPTURE_INTERVAL}s"}
+if __name__ == "__main__":
+    main()
