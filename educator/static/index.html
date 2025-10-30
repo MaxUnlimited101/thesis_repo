@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Monitoring Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-label {
+            color: #888;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+
+        .stat-value {
+            color: #333;
+            font-size: 32px;
+            font-weight: bold;
+        }
+
+        .plot-container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .plot-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .plot-title {
+            font-size: 24px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        select {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        select:hover {
+            border-color: #667eea;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        .plot-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 16px;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .last-update {
+            color: #888;
+            font-size: 14px;
+            margin-top: 15px;
+            text-align: right;
+        }
+
+        .refresh-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #4CAF50;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .students-list {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .students-list h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .student-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .student-item:hover {
+            background: #f9f9f9;
+        }
+
+        .student-item:last-child {
+            border-bottom: none;
+        }
+
+        .student-name {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .student-count {
+            color: #888;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Emotion Monitoring Dashboard</h1>
+            <p class="subtitle">Real-time emotion distribution tracking for students</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">Total Students</div>
+                <div class="stat-value" id="totalStudents">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Total Predictions</div>
+                <div class="stat-value" id="totalPredictions">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Sessions</div>
+                <div class="stat-value" id="activeSessions">0</div>
+            </div>
+        </div>
+
+        <div class="plot-container">
+            <div class="plot-header">
+                <div class="plot-title">Emotion Distribution Over Time</div>
+                <div class="controls">
+                    <select id="studentSelect">
+                        <option value="">All Students</option>
+                    </select>
+                    <button onclick="refreshPlot()">🔄 Refresh</button>
+                </div>
+            </div>
+            
+            <img id="emotionPlot" class="plot-image" alt="Emotion Distribution Chart">
+            <div class="loading" id="loadingIndicator">Loading data...</div>
+            <div class="error" id="errorMessage"></div>
+            
+            <div class="last-update">
+                <span class="refresh-indicator"></span>
+                Last updated: <span id="lastUpdate">Never</span>
+            </div>
+        </div>
+
+        <div class="students-list">
+            <h2>Active Students</h2>
+            <div id="studentsList"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        let autoRefreshInterval;
+        const REFRESH_INTERVAL = 10000; // 10 seconds
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            refreshPlot();
+            fetchStatistics();
+            startAutoRefresh();
+            
+            // Student select change handler
+            document.getElementById('studentSelect').addEventListener('change', (e) => {
+                refreshPlot();
+            });
+        });
+
+        async function refreshPlot() {
+            const plotImg = document.getElementById('emotionPlot');
+            const loading = document.getElementById('loadingIndicator');
+            const errorDiv = document.getElementById('errorMessage');
+            const studentId = document.getElementById('studentSelect').value;
+            
+            loading.style.display = 'block';
+            plotImg.style.display = 'none';
+            errorDiv.style.display = 'none';
+            
+            try {
+                const url = studentId 
+                    ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
+                    : `${API_BASE}/api/plot?t=${Date.now()}`;
+                
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error('No data available');
+                }
+                
+                plotImg.src = url;
+                plotImg.style.display = 'block';
+                loading.style.display = 'none';
+                updateLastUpdateTime();
+            } catch (error) {
+                loading.style.display = 'none';
+                errorDiv.textContent = `Error loading plot: ${error.message}`;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        async function fetchStatistics() {
+            try {
+                const response = await fetch(`${API_BASE}/api/statistics`);
+                const data = await response.json();
+                
+                // Update stats
+                document.getElementById('totalStudents').textContent = data.total_students || 0;
+                document.getElementById('totalPredictions').textContent = data.total_predictions || 0;
+                document.getElementById('activeSessions').textContent = data.active_sessions || 0;
+                
+                // Update student dropdown and list
+                updateStudentsList(data.students || {});
+            } catch (error) {
+                console.error('Error fetching statistics:', error);
+            }
+        }
+
+        function updateStudentsList(students) {
+            const select = document.getElementById('studentSelect');
+            const listDiv = document.getElementById('studentsList');
+            
+            // Keep "All Students" option
+            const currentValue = select.value;
+            select.innerHTML = '<option value="">All Students</option>';
+            
+            // Clear list
+            listDiv.innerHTML = '';
+            
+            if (Object.keys(students).length === 0) {
+                listDiv.innerHTML = '<div style="color: #888; padding: 20px; text-align: center;">No students yet</div>';
+                return;
+            }
+            
+            // Add students
+            Object.entries(students).forEach(([studentId, count]) => {
+                // Add to dropdown
+                const option = document.createElement('option');
+                option.value = studentId;
+                option.textContent = studentId;
+                select.appendChild(option);
+                
+                // Add to list
+                const item = document.createElement('div');
+                item.className = 'student-item';
+                item.innerHTML = `
+                    <span class="student-name">${studentId}</span>
+                    <span class="student-count">${count} predictions</span>
+                `;
+                listDiv.appendChild(item);
+            });
+            
+            // Restore selection
+            select.value = currentValue;
+        }
+
+        function updateLastUpdateTime() {
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+        }
+
+        function startAutoRefresh() {
+            autoRefreshInterval = setInterval(() => {
+                refreshPlot();
+                fetchStatistics();
+            }, REFRESH_INTERVAL);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', stopAutoRefresh);
+    </script>
+</body>
+</html>
