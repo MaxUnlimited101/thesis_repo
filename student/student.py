@@ -19,6 +19,44 @@ CLASS_NAMES = ('angry', 'disgust', 'contempt', 'fear', 'happy', 'neutral',
 # ----------------------------------------
 
 
+def list_available_cameras(max_cameras=10):
+    """Find available cameras by trying to open them"""
+    available = []
+    for i in range(max_cameras):
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            available.append(i)
+            cap.release()
+    return available
+
+
+def select_camera():
+    """Let user select a camera from available options"""
+    print("\nScanning for available cameras...")
+    cameras = list_available_cameras()
+    
+    if not cameras:
+        print("Error: No cameras found!")
+        return None
+    
+    print(f"\nAvailable cameras: {cameras}")
+    
+    if len(cameras) == 1:
+        print(f"Using camera {cameras[0]} (only one found)")
+        return cameras[0]
+    
+    while True:
+        try:
+            choice = input(f"Select camera number {cameras}: ").strip()
+            camera_id = int(choice)
+            if camera_id in cameras:
+                return camera_id
+            else:
+                print(f"Invalid choice. Please select from: {cameras}")
+        except (ValueError, KeyboardInterrupt):
+            print(f"\nInvalid input. Please enter a number from: {cameras}")
+    
+
 def init():
     # ask for endpoint URL
     global ENDPOINT_URL
@@ -68,15 +106,44 @@ def main():
     print("Initializing model...")
     model, device = init()
     
-    print(f"Opening camera...")
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        print("Error: Could not open camera")
+    # Select camera
+    camera_id = select_camera()
+    if camera_id is None:
         return
     
-    print(f"Camera running. Sending predictions every {CAPTURE_INTERVAL}s to {ENDPOINT_URL}")
-    print("Press Ctrl+C to stop")
+    print(f"\nOpening camera {camera_id}...")
+    
+    # Try to open camera with retries
+    max_retries = 3
+    cap = None
+    
+    for attempt in range(1, max_retries + 1):
+        print(f"Attempt {attempt}/{max_retries}...")
+        cap = cv2.VideoCapture(camera_id)
+        
+        if cap.isOpened():
+            # Test if we can actually read a frame
+            ret, frame = cap.read()
+            if ret:
+                print(f"✓ Camera {camera_id} opened successfully!")
+                break
+            else:
+                print(f"✗ Camera opened but couldn't read frame")
+                cap.release()
+                cap = None
+        else:
+            print(f"✗ Failed to open camera {camera_id}")
+        
+        if attempt < max_retries:
+            print("Retrying in 2 seconds...")
+            time.sleep(2)
+    
+    if cap is None or not cap.isOpened():
+        print(f"\nError: Could not open camera {camera_id} after {max_retries} attempts")
+        return
+    
+    print(f"\nCamera running. Sending predictions every {CAPTURE_INTERVAL}s to {ENDPOINT_URL}")
+    print("Press Ctrl+C to stop\n")
     
     try:
         GUID = uuid.uuid4()

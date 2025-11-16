@@ -258,7 +258,8 @@
                     <select id="studentSelect">
                         <option value="">All Students</option>
                     </select>
-                    <button onclick="refreshPlot()">🔄 Refresh</button>
+                        <button onclick="refreshPlot()">🔄 Refresh</button>
+                        <span id="smallLoader" class="refresh-indicator" style="display:none; margin-left:8px;"></span>
                 </div>
             </div>
             
@@ -305,26 +306,40 @@
             plotImg.style.display = 'none';
             errorDiv.style.display = 'none';
             
-            try {
-                const url = studentId 
-                    ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
-                    : `${API_BASE}/api/plot?t=${Date.now()}`;
-                
-                const response = await fetch(url);
-                
-                if (!response.ok) {
-                    throw new Error('No data available');
+                try {
+                    const url = studentId 
+                        ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
+                        : `${API_BASE}/api/plot?t=${Date.now()}`;
+
+                    // Show small loader while new image is loading, keep old image visible
+                    const smallLoader = document.getElementById('smallLoader');
+                    smallLoader.style.display = 'inline-block';
+                    errorDiv.style.display = 'none';
+
+                    // Load new image in background
+                    const loader = new Image();
+                    loader.onload = () => {
+                        // Swap in the newly loaded image
+                        plotImg.src = url;
+                        plotImg.style.display = 'block';
+                        loading.style.display = 'none';
+                        smallLoader.style.display = 'none';
+                        updateLastUpdateTime();
+                    };
+                    loader.onerror = () => {
+                        smallLoader.style.display = 'none';
+                        loading.style.display = 'none';
+                        errorDiv.textContent = `Error loading plot`;
+                        errorDiv.style.display = 'block';
+                    };
+
+                    // Trigger load (browser will fetch the image)
+                    loader.src = url;
+                } catch (error) {
+                    loading.style.display = 'none';
+                    errorDiv.textContent = `Error loading plot: ${error.message}`;
+                    errorDiv.style.display = 'block';
                 }
-                
-                plotImg.src = url;
-                plotImg.style.display = 'block';
-                loading.style.display = 'none';
-                updateLastUpdateTime();
-            } catch (error) {
-                loading.style.display = 'none';
-                errorDiv.textContent = `Error loading plot: ${error.message}`;
-                errorDiv.style.display = 'block';
-            }
         }
 
         async function fetchStatistics() {
