@@ -76,7 +76,7 @@ async def calculate_overall_statistics():
     return stats
 
 
-async def generate_plot(student_id: str = None):
+async def generate_plot(student_id: str = None, cumulative: bool = False):
     """Generate a stacked area chart showing emotion distribution over time"""
     
     async with predictions_lock:
@@ -109,6 +109,9 @@ async def generate_plot(student_id: str = None):
         
         # Convert to numpy arrays for stacking
         emotion_arrays = [np.array(emotion_data[key]) for key in emotion_keys]
+
+        if cumulative:
+            emotion_arrays = [np.cumsum(arr) for arr in emotion_arrays]
         
         # Create the plot
         fig, ax = plt.subplots(figsize=(12, 6))
@@ -136,10 +139,15 @@ async def generate_plot(student_id: str = None):
         
         # Customize the plot
         ax.set_xlabel('Time (session index)', fontsize=12)
-        ax.set_ylabel('Emotion Probability', fontsize=12)
-        ax.set_title(f'Emotion Distribution Over Time - {student_id if student_id else "All Students"}', 
-                     fontsize=14, pad=20)
-        ax.set_ylim(0, 1)
+        ylabel = 'Cumulative Emotion Count' if cumulative else 'Emotion Probability'
+        ax.set_ylabel(ylabel, fontsize=12)
+
+        title_suffix = f" - {student_id}" if student_id else " - All Students"
+        title_prefix = "Cumulative " if cumulative else ""
+        ax.set_title(f'{title_prefix}Emotion Distribution Over Time{title_suffix}', fontsize=14, pad=20)
+        
+        if not cumulative:
+            ax.set_ylim(0, 1)
         ax.grid(True, alpha=0.3, linestyle='--')
         
         # Add legend
@@ -160,9 +168,10 @@ async def generate_plot(student_id: str = None):
 
 
 @app.get("/api/plot/{student_id}")
-async def get_student_plot(student_id: str):
+async def get_student_plot(student_id: str, type: str = "regular"):
     """Get emotion distribution plot for a specific student"""
-    plot_buffer = await generate_plot(student_id)
+    cumulative = (type == "cumulative")
+    plot_buffer = await generate_plot(student_id, cumulative=cumulative)
     
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
@@ -171,9 +180,10 @@ async def get_student_plot(student_id: str):
     return StreamingResponse(plot_buffer, media_type="image/png")
 
 @app.get("/api/plot")
-async def get_all_students_plot():
+async def get_all_students_plot(type: str = "regular"):
     """Get emotion distribution plot for all students combined"""
-    plot_buffer = await generate_plot()
+    cumulative = (type == "cumulative")
+    plot_buffer = await generate_plot(cumulative=cumulative)
     
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
