@@ -5,6 +5,7 @@ import requests
 import time
 from urllib.parse import urljoin
 import uuid
+import argparse
 
 
 # ---------------- CONFIG ----------------
@@ -102,7 +103,20 @@ def send_to_server(data):
         print(f"Error sending: {e}")
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Emotion client for Educator server.")
+    parser.add_argument(
+        '--show-camera',
+        '-s',
+        action='store_true',
+        help='Display the real-time camera feed.'
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
+
     print("Initializing model...")
     model, device = init()
     
@@ -142,8 +156,13 @@ def main():
         print(f"\nError: Could not open camera {camera_id} after {max_retries} attempts")
         return
     
+    if args.show_camera:
+        print("Camera view enabled. Press 'q' in the camera window to close it and stop the program.")
+    
     print(f"\nCamera running. Sending predictions every {CAPTURE_INTERVAL}s to {ENDPOINT_URL}")
     print("Press Ctrl+C to stop\n")
+    
+    last_capture_time = time.time()
     
     try:
         GUID = uuid.uuid4()
@@ -153,20 +172,39 @@ def main():
                 print("Warning: Could not read frame")
                 continue
             
-            preds = predict(frame, model, device)
-            print(f"Predictions: {preds}")
-            data = {
-                "id": str(GUID),
-                "predictions": preds
-            }
-            send_to_server(data)
+            current_time = time.time()
             
-            time.sleep(CAPTURE_INTERVAL)
-    
+            if current_time - last_capture_time >= CAPTURE_INTERVAL:
+                preds = predict(frame, model, device)
+                print(f"Predictions: {preds}")
+                data = {
+                    "id": str(GUID),
+                    "predictions": preds
+                }
+                send_to_server(data)
+                
+                last_capture_time = current_time 
+
+            if args.show_camera:
+                frame = cv2.flip(frame, 1)
+                status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
+                display_frame = cv2.resize(frame, (640, 480)) 
+                cv2.putText(display_frame, status_text, (10, 30), 
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                
+                cv2.imshow("Real-Time Camera View (Press 'q' to stop)", display_frame)
+                
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                time.sleep(0.01)
+
     except KeyboardInterrupt:
         print("\nStopping...")
     finally:
         cap.release()
+        if args.show_camera:
+            cv2.destroyAllWindows()
         print("Camera released. Goodbye!")
 
 
