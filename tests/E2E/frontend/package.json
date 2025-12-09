@@ -1,0 +1,18 @@
+{
+  "name": "emotion-dashboard-e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for emotion monitoring dashboard",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:report": "playwright show-report"
+  },
+  "keywords": ["e2e", "playwright", "testing"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0"
+  }
+}
