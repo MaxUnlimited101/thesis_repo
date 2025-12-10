@@ -213,3 +213,31 @@ class TestCameraSelection:
         result = select_camera()
         
         assert result is None
+
+
+# ============== INTEGRATION TESTS ==============
+
+class TestEndToEndPrediction:
+    @pytest.fixture
+    def simple_model(self):
+        """Create a simple model for testing"""
+        model = torch.nn.Sequential(
+            torch.nn.Flatten(),
+            torch.nn.Linear(224 * 224 * 3, 8)
+        )
+        model.eval()
+        return model
+    
+    def test_full_prediction_pipeline(self, simple_model):
+        """Test complete prediction pipeline"""
+        # Create test frame
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        
+        # Run prediction
+        result = predict(frame, simple_model, device='cpu')
+        
+        # Verify result
+        assert isinstance(result, dict)
+        assert len(result) == 8
+        assert all(0 <= v <= 1 for v in result.values())
+        assert abs(sum(result.values()) - 1.0) < 0.01
