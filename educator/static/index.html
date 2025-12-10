@@ -258,6 +258,10 @@
                     <select id="studentSelect">
                         <option value="">All Students</option>
                     </select>
+                    <select id="graphTypeSelect">
+                        <option value="regular">Regular</option>
+                        <option value="cumulative">Cumulative</option>
+                    </select>
                         <button onclick="refreshPlot()">🔄 Refresh</button>
                         <span id="smallLoader" class="refresh-indicator" style="display:none; margin-left:8px;"></span>
                 </div>
@@ -294,6 +298,11 @@
             document.getElementById('studentSelect').addEventListener('change', (e) => {
                 refreshPlot();
             });
+
+            // Graph type select change handler
+            document.getElementById('graphTypeSelect').addEventListener('change', (e) => {
+                refreshPlot();
+            });
         });
 
         async function refreshPlot() {
@@ -301,15 +310,17 @@
             const loading = document.getElementById('loadingIndicator');
             const errorDiv = document.getElementById('errorMessage');
             const studentId = document.getElementById('studentSelect').value;
+            const graphType = document.getElementById('graphTypeSelect').value;
             
             loading.style.display = 'block';
             plotImg.style.display = 'none';
             errorDiv.style.display = 'none';
             
                 try {
-                    const url = studentId 
+                    const url = (studentId 
                         ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
-                        : `${API_BASE}/api/plot?t=${Date.now()}`;
+                        : `${API_BASE}/api/plot?t=${Date.now()}`)
+                        + `&type=${graphType}`;
 
                     // Show small loader while new image is loading, keep old image visible
                     const smallLoader = document.getElementById('smallLoader');
