@@ -90,3 +90,35 @@ class TestEmotionsEndpoint:
         async with predictions_lock:
             assert len(predictions_log) == 3
             assert all(sid == student_id for sid, _, _ in predictions_log)
+
+
+class TestStatisticsEndpoint:
+    @pytest.mark.asyncio
+    async def test_statistics_empty(self, client, clean_predictions):
+        """Test statistics with no data"""
+        response = client.get("/api/statistics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_students"] == 0
+        assert data["total_predictions"] == 0
+        assert data["active_sessions"] == 0
+    
+    @pytest.mark.asyncio
+    async def test_statistics_with_data(self, client, clean_predictions):
+        """Test statistics with sample data"""
+        # Add test data
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.8}))
+            predictions_log.append(("student_1", 1005, {"happy": 0.7}))
+            predictions_log.append(("student_2", 1010, {"sad": 0.6}))
+        
+        response = client.get("/api/statistics")
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_students"] == 2
+        assert data["total_predictions"] == 3
+        assert data["active_sessions"] == 2
+        assert data["students"]["student_1"] == 2
+        assert data["students"]["student_2"] == 1
