@@ -353,3 +353,25 @@ class TestTunnelSetup:
             token="test_token"
         )
         assert result == mock_tunnel_obj
+
+
+class TestInit:
+    @patch('builtins.open', create=True)
+    def test_init_success(self, mock_open):
+        """Test successful initialization"""
+        from educator import init
+        
+        mock_open.return_value.__enter__.return_value.read.return_value = "test_token_123"
+        
+        init()
+        
+        from educator import TOKEN
+        assert TOKEN == "test_token_123"
+    
+    @patch('builtins.open', side_effect=FileNotFoundError)
+    def test_init_missing_token(self, mock_open):
+        """Test initialization with missing token file"""
+        from educator import init
+        
+        with pytest.raises(SystemExit):
+            init()
