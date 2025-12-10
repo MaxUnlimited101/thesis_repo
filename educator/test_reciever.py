@@ -309,3 +309,26 @@ class TestConcurrentRequests:
         # Verify all data was stored
         async with predictions_lock:
             assert len(predictions_log) == 10
+
+
+class TestDataPersistence:
+    @pytest.mark.asyncio
+    async def test_data_accumulation(self, client, clean_predictions):
+        """Test that data accumulates correctly over time"""
+        students = ["alice", "bob", "charlie"]
+        
+        for _ in range(5):
+            for student in students:
+                data = {
+                    "id": student,
+                    "predictions": {"happy": 0.7}
+                }
+                client.post("/api/emotions", json=data)
+        
+        response = client.get("/api/statistics")
+        stats = response.json()
+        
+        assert stats["total_students"] == 3
+        assert stats["total_predictions"] == 15
+        for student in students:
+            assert stats["students"][student] == 5
