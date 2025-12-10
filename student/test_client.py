@@ -93,3 +93,45 @@ class TestPrediction:
         
         for emotion in CLASS_NAMES:
             assert emotion in result
+
+
+class TestSendToServer:
+    @patch('student.requests.post')
+    def test_send_successful(self, mock_post):
+        """Test successful data transmission"""
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_post.return_value = mock_response
+        
+        test_data = {
+            "id": "test_student",
+            "predictions": {"happy": 0.8}
+        }
+        
+        # Should not raise exception
+        send_to_server(test_data)
+        
+        mock_post.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
+        assert call_kwargs['json'] == test_data
+        assert call_kwargs['timeout'] == 5
+    
+    @patch('student.requests.post')
+    def test_send_failure(self, mock_post):
+        """Test handling of network failure"""
+        mock_post.side_effect = requests.exceptions.RequestException("Network error")
+        
+        test_data = {"id": "test", "predictions": {}}
+        
+        # Should handle exception gracefully
+        send_to_server(test_data)  # Should not raise
+    
+    @patch('student.requests.post')
+    def test_send_timeout(self, mock_post):
+        """Test handling of timeout"""
+        mock_post.side_effect = requests.exceptions.Timeout("Timeout")
+        
+        test_data = {"id": "test", "predictions": {}}
+        
+        # Should handle timeout gracefully
+        send_to_server(test_data)
