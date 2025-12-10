@@ -135,3 +135,35 @@ class TestSendToServer:
         
         # Should handle timeout gracefully
         send_to_server(test_data)
+
+
+class TestCameraListing:
+    @patch('student.cv2.VideoCapture')
+    def test_list_available_cameras_found(self, mock_capture):
+        """Test finding available cameras"""
+        # Mock: cameras 0 and 2 are available, 1 is not
+        mock_caps = []
+        for i in range(3):
+            mock_cap = Mock()
+            mock_cap.isOpened.return_value = (i != 1)  # False for index 1
+            mock_cap.release = Mock()
+            mock_caps.append(mock_cap)
+        
+        mock_capture.side_effect = mock_caps
+        
+        result = list_available_cameras(max_cameras=3)
+        
+        assert result == [0, 2]
+        assert mock_capture.call_count == 3
+    
+    @patch('student.cv2.VideoCapture')
+    def test_list_available_cameras_none(self, mock_capture):
+        """Test when no cameras are available"""
+        mock_cap = Mock()
+        mock_cap.isOpened.return_value = False
+        mock_cap.release = Mock()
+        mock_capture.return_value = mock_cap
+        
+        result = list_available_cameras(max_cameras=5)
+        
+        assert result == []
