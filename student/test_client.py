@@ -48,3 +48,48 @@ class TestPreprocessing:
         # Channel 2 should have highest values
         assert result[0, 2].mean() > result[0, 0].mean()
         assert result[0, 2].mean() > result[0, 1].mean()
+
+
+class TestPrediction:
+    @pytest.fixture
+    def mock_model(self):
+        """Create a mock model"""
+        model = Mock()
+        model.eval = Mock()
+        model.to = Mock(return_value=model)
+        
+        # Mock output: batch_size=1, num_classes=8
+        mock_output = torch.randn(1, 8)
+        model.return_value = mock_output
+        
+        return model
+    
+    def test_predict_output_format(self, mock_model):
+        """Test that predict returns correct format"""
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        
+        result = predict(frame, mock_model, device='cpu')
+        
+        # Should return dict with 8 emotions
+        assert isinstance(result, dict)
+        assert len(result) == 8
+        assert all(isinstance(v, float) for v in result.values())
+    
+    def test_predict_probabilities_sum_to_one(self, mock_model):
+        """Test that probabilities approximately sum to 1"""
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        
+        result = predict(frame, mock_model, device='cpu')
+        
+        total_prob = sum(result.values())
+        assert abs(total_prob - 1.0) < 0.01
+    
+    def test_predict_emotion_names(self, mock_model):
+        """Test that all expected emotion names are present"""
+        from student import CLASS_NAMES
+        
+        frame = np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8)
+        result = predict(frame, mock_model, device='cpu')
+        
+        for emotion in CLASS_NAMES:
+            assert emotion in result
