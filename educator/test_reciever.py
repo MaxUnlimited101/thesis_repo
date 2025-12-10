@@ -332,3 +332,24 @@ class TestDataPersistence:
         assert stats["total_predictions"] == 15
         for student in students:
             assert stats["students"][student] == 5
+
+
+# # ============== MOCK TESTS FOR EXTERNAL DEPENDENCIES ==============
+
+class TestTunnelSetup:
+    @patch('educator.pinggy.start_tunnel')
+    def test_setup_tunnel(self, mock_tunnel):
+        """Test tunnel setup with mocked pinggy"""
+        from educator import setup_tunnel
+        
+        mock_tunnel_obj = Mock()
+        mock_tunnel_obj.urls = ["https://test.pinggy.io"]
+        mock_tunnel.return_value = mock_tunnel_obj
+        
+        result = setup_tunnel("test_token")
+        
+        mock_tunnel.assert_called_once_with(
+            forwardto="localhost:8001",
+            token="test_token"
+        )
+        assert result == mock_tunnel_obj
