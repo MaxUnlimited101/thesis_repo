@@ -279,3 +279,33 @@ class TestEndToEndWorkflow:
         response = client.get("/api/plot/student_alpha")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
+
+
+class TestConcurrentRequests:
+    @pytest.mark.asyncio
+    async def test_concurrent_emotion_submissions(self, client, clean_predictions):
+        """Test handling concurrent emotion submissions"""
+        import asyncio
+        from concurrent.futures import ThreadPoolExecutor
+        
+        def send_emotion(student_id):
+            data = {
+                "id": student_id,
+                "predictions": {"happy": 0.5}
+            }
+            return client.post("/api/emotions", json=data)
+        
+        # Send 10 concurrent requests
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [
+                executor.submit(send_emotion, f"student_{i}")
+                for i in range(10)
+            ]
+            responses = [f.result() for f in futures]
+        
+        # All should succeed
+        assert all(r.status_code == 200 for r in responses)
+        
+        # Verify all data was stored
+        async with predictions_lock:
+            assert len(predictions_log) == 10
