@@ -209,3 +209,41 @@ class TestPlotGeneration:
         
         plot_buffer = await generate_plot(cumulative=True)
         assert plot_buffer is not None
+
+
+class TestPlotEndpoints:
+    @pytest.mark.asyncio
+    async def test_plot_endpoint_no_data(self, client, clean_predictions):
+        """Test plot endpoint with no data"""
+        response = client.get("/api/plot")
+        assert response.status_code == 404
+        assert response.json()["error"] == "No data available"
+    
+    @pytest.mark.asyncio
+    async def test_plot_endpoint_with_data(self, client, clean_predictions):
+        """Test plot endpoint with data"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.8}))
+        
+        response = client.get("/api/plot")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+    
+    @pytest.mark.asyncio
+    async def test_student_plot_endpoint(self, client, clean_predictions):
+        """Test student-specific plot endpoint"""
+        async with predictions_lock:
+            predictions_log.append(("student_123", 1000, {"happy": 0.8}))
+        
+        response = client.get("/api/plot/student_123")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+    
+    @pytest.mark.asyncio
+    async def test_cumulative_plot_endpoint(self, client, clean_predictions):
+        """Test cumulative plot endpoint"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.5}))
+        
+        response = client.get("/api/plot?type=cumulative")
+        assert response.status_code == 200
