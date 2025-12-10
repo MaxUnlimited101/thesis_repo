@@ -122,3 +122,37 @@ class TestStatisticsEndpoint:
         assert data["active_sessions"] == 2
         assert data["students"]["student_1"] == 2
         assert data["students"]["student_2"] == 1
+
+
+class TestCalculateOverallStatistics:
+    @pytest.mark.asyncio
+    async def test_empty_log(self, clean_predictions):
+        """Test statistics calculation with empty log"""
+        stats = await calculate_overall_statistics()
+        assert stats == {}
+    
+    @pytest.mark.asyncio
+    async def test_single_student(self, clean_predictions):
+        """Test statistics for single student"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.8, "sad": 0.2}))
+            predictions_log.append(("student_1", 1005, {"happy": 0.6, "sad": 0.4}))
+        
+        stats = await calculate_overall_statistics()
+        
+        assert "student_1" in stats
+        assert stats["student_1"]["happy"] == pytest.approx(0.7)
+        assert stats["student_1"]["sad"] == pytest.approx(0.3)
+    
+    @pytest.mark.asyncio
+    async def test_multiple_students(self, clean_predictions):
+        """Test statistics for multiple students"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 1.0}))
+            predictions_log.append(("student_2", 1005, {"happy": 0.5}))
+        
+        stats = await calculate_overall_statistics()
+        
+        assert len(stats) == 2
+        assert stats["student_1"]["happy"] == 1.0
+        assert stats["student_2"]["happy"] == 0.5
