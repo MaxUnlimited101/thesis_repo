@@ -156,3 +156,56 @@ class TestCalculateOverallStatistics:
         assert len(stats) == 2
         assert stats["student_1"]["happy"] == 1.0
         assert stats["student_2"]["happy"] == 0.5
+
+
+class TestPlotGeneration:
+    @pytest.mark.asyncio
+    async def test_generate_plot_empty_log(self, clean_predictions):
+        """Test plot generation with empty log"""
+        result = await generate_plot()
+        assert result is None
+    
+    @pytest.mark.asyncio
+    async def test_generate_plot_with_data(self, clean_predictions):
+        """Test successful plot generation"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {
+                "happy": 0.8, "sad": 0.1, "neutral": 0.1
+            }))
+            predictions_log.append(("student_1", 1005, {
+                "happy": 0.6, "sad": 0.2, "neutral": 0.2
+            }))
+        
+        plot_buffer = await generate_plot()
+        
+        assert plot_buffer is not None
+        assert isinstance(plot_buffer, io.BytesIO)
+        
+        # Verify it's a valid image
+        plot_buffer.seek(0)
+        img = Image.open(plot_buffer)
+        assert img.format == "PNG"
+    
+    @pytest.mark.asyncio
+    async def test_generate_plot_specific_student(self, clean_predictions):
+        """Test plot generation for specific student"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.8}))
+            predictions_log.append(("student_2", 1005, {"sad": 0.7}))
+        
+        plot_buffer = await generate_plot(student_id="student_1")
+        assert plot_buffer is not None
+        
+        # Test non-existent student
+        plot_buffer = await generate_plot(student_id="student_999")
+        assert plot_buffer is None
+    
+    @pytest.mark.asyncio
+    async def test_generate_cumulative_plot(self, clean_predictions):
+        """Test cumulative plot generation"""
+        async with predictions_lock:
+            predictions_log.append(("student_1", 1000, {"happy": 0.5}))
+            predictions_log.append(("student_1", 1005, {"happy": 0.5}))
+        
+        plot_buffer = await generate_plot(cumulative=True)
+        assert plot_buffer is not None
