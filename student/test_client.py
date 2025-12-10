@@ -167,3 +167,49 @@ class TestCameraListing:
         result = list_available_cameras(max_cameras=5)
         
         assert result == []
+
+
+class TestCameraSelection:
+    @patch('student.list_available_cameras')
+    @patch('builtins.input')
+    def test_select_camera_single_available(self, mock_input, mock_list):
+        """Test auto-selection when only one camera available"""
+        mock_list.return_value = [0]
+        
+        result = select_camera()
+        
+        assert result == 0
+        mock_input.assert_not_called()
+    
+    @patch('student.list_available_cameras')
+    @patch('builtins.input')
+    def test_select_camera_multiple_available(self, mock_input, mock_list):
+        """Test selection when multiple cameras available"""
+        mock_list.return_value = [0, 1, 2]
+        mock_input.return_value = "1"
+        
+        result = select_camera()
+        
+        assert result == 1
+        mock_input.assert_called_once()
+    
+    @patch('student.list_available_cameras')
+    @patch('builtins.input')
+    def test_select_camera_invalid_then_valid(self, mock_input, mock_list):
+        """Test handling of invalid input followed by valid input"""
+        mock_list.return_value = [0, 1]
+        mock_input.side_effect = ["5", "invalid", "0"]
+        
+        result = select_camera()
+        
+        assert result == 0
+        assert mock_input.call_count == 3
+    
+    @patch('student.list_available_cameras')
+    def test_select_camera_none_available(self, mock_list):
+        """Test when no cameras are available"""
+        mock_list.return_value = []
+        
+        result = select_camera()
+        
+        assert result is None
