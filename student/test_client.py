@@ -289,3 +289,46 @@ class TestArgumentParsing:
         with patch('sys.argv', ['student.py', '-s']):
             args = parse_args()
             assert args.show_camera is True
+
+
+# ============== MOCK INTEGRATION TESTS ==============
+
+class TestMockIntegration:
+    @patch('student.cv2.VideoCapture')
+    @patch('student.send_to_server')
+    @patch('student.select_camera')
+    @patch('student.init')
+    def test_main_loop_simulation(self, mock_init, mock_select, mock_send, mock_capture):
+        """Test main loop with mocked components"""
+        # Setup mocks
+        mock_model = Mock()
+        mock_model.eval = Mock()
+        mock_model.to = Mock(return_value=mock_model)
+        mock_output = torch.randn(1, 8)
+        mock_model.return_value = mock_output
+        
+        mock_init.return_value = (mock_model, 'cpu')
+        mock_select.return_value = 0
+        
+        mock_cap = Mock()
+        mock_cap.isOpened.return_value = True
+        mock_cap.read.return_value = (True, np.random.randint(0, 255, (480, 640, 3), dtype=np.uint8))
+        mock_cap.release = Mock()
+        mock_capture.return_value = mock_cap
+        
+        # Simulate a few iterations
+        model, device = mock_init()
+        camera_id = mock_select()
+        cap = mock_capture(camera_id)
+        
+        for i in range(3):
+            ret, frame = cap.read()
+            assert ret is True
+            preds = predict(frame, model, device)
+            mock_send({"id": "test", "predictions": preds})
+        
+        cap.release()
+        
+        # Verify calls
+        assert mock_send.call_count == 3
+        mock_cap.release.assert_called_once()
