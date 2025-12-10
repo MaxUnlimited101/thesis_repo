@@ -265,3 +265,27 @@ class TestVideoCapture:
         
         assert cap is not None
         assert cap.isOpened()
+
+
+# ============== ARGUMENT PARSING TESTS ==============
+
+class TestArgumentParsing:
+    def test_parse_args_default(self):
+        """Test default argument parsing"""
+        from student import parse_args
+        
+        with patch('sys.argv', ['student.py']):
+            args = parse_args()
+            assert args.show_camera is False
+    
+    def test_parse_args_show_camera(self):
+        """Test --show-camera argument"""
+        from student import parse_args
+        
+        with patch('sys.argv', ['student.py', '--show-camera']):
+            args = parse_args()
+            assert args.show_camera is True
+        
+        with patch('sys.argv', ['student.py', '-s']):
+            args = parse_args()
+            assert args.show_camera is True
