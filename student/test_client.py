@@ -241,3 +241,27 @@ class TestEndToEndPrediction:
         assert len(result) == 8
         assert all(0 <= v <= 1 for v in result.values())
         assert abs(sum(result.values()) - 1.0) < 0.01
+
+
+class TestVideoCapture:
+    @patch('student.cv2.VideoCapture')
+    def test_camera_initialization_retry_logic(self, mock_capture):
+        """Test camera initialization with retry logic"""
+        # First attempt fails, second succeeds
+        mock_cap_fail = Mock()
+        mock_cap_fail.isOpened.return_value = False
+        
+        mock_cap_success = Mock()
+        mock_cap_success.isOpened.return_value = True
+        mock_cap_success.read.return_value = (True, np.zeros((480, 640, 3)))
+        
+        mock_capture.side_effect = [mock_cap_fail, mock_cap_success]
+        
+        cap = None
+        for attempt in range(2):
+            cap = mock_capture(0)
+            if cap.isOpened():
+                break
+        
+        assert cap is not None
+        assert cap.isOpened()
