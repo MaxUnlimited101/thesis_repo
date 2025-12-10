@@ -247,3 +247,35 @@ class TestPlotEndpoints:
         
         response = client.get("/api/plot?type=cumulative")
         assert response.status_code == 200
+
+
+# # ============== INTEGRATION TESTS ==============
+
+class TestEndToEndWorkflow:
+    @pytest.mark.asyncio
+    async def test_complete_workflow(self, client, clean_predictions):
+        """Test complete workflow: receive data -> check stats -> get plot"""
+        # Step 1: Send emotion data
+        for i in range(3):
+            data = {
+                "id": "student_alpha",
+                "predictions": {
+                    "happy": 0.5 + i * 0.1,
+                    "neutral": 0.3,
+                    "sad": 0.2 - i * 0.05
+                }
+            }
+            response = client.post("/api/emotions", json=data)
+            assert response.status_code == 200
+        
+        # Step 2: Check statistics
+        response = client.get("/api/statistics")
+        assert response.status_code == 200
+        stats = response.json()
+        assert stats["total_students"] == 1
+        assert stats["total_predictions"] == 3
+        
+        # Step 3: Get plot
+        response = client.get("/api/plot/student_alpha")
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
