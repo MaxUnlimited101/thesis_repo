@@ -384,7 +384,7 @@ def train_model_with_test(model, train_loader, val_loader, test_loader, criterio
 
 def main():
     # Configuration
-    BATCH_SIZE = 32 # Adjust based on your system's capability
+    BATCH_SIZE = 32
     NUM_EPOCHS = 10
     LEARNING_RATE = 0.001
     VAL_SPLIT = 0.1
@@ -405,6 +405,7 @@ def main():
     dataset = datasets.combine_datasets(all_datasets)
 
     # Get data loaders
+    # This takes ~5 minutes
     train_loader, val_loader, test_loader = get_train_validation_test_split_dataloaders(dataset, VAL_SPLIT, TEST_SPLIT, BATCH_SIZE, NUM_WORKERS)
 
     # Initialize model, loss function, and optimizer

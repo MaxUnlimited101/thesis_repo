@@ -29,3 +29,6 @@ __pycache__/
 *.swp
 *.swo
 *.bak
+
+# models
+*.pth
