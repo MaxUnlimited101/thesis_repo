@@ -39,32 +39,6 @@ class ResNet50(nn.Module):
     def forward(self, x):
         return self.backbone(x)
     
-    
-class SimpleCNN(nn.Module):
-    def __init__(self, num_classes=8, input_shape=(3, 224, 224)):
-        super(SimpleCNN, self).__init__()
-        
-        self.backbone = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=5, stride=1, padding=2),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Conv2d(32, 64, kernel_size=5, stride=1, padding=2),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Conv2d(64, 128, kernel_size=5, stride=1, padding=2),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Flatten(),
-            nn.Linear(128 * 28 * 28, 512),
-            nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.Linear(512, num_classes)
-        )
-
-    def forward(self, x):
-        x = self.backbone(x)
-        return x
-    
 
 class EfficientNetB0(nn.Module):
     def __init__(self, pretrained=True):
@@ -86,35 +60,6 @@ class MobileNetV2(nn.Module):
         return self.backbone(x)
     
 
-class SimpleCNNv2(nn.Module):
-    def __init__(self, num_classes=8, input_shape=(3, 224, 224)):
-        super(SimpleCNNv2, self).__init__()
-        
-        self.backbone = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, stride=2, padding=0),
-            nn.Flatten(),
-            nn.Linear(256 * 14 * 14, 512),
-            nn.ReLU(),
-            nn.Dropout(p=0.5),
-            nn.Linear(512, num_classes)
-        )
-
-    def forward(self, x):
-        x = self.backbone(x)
-        return x
-    
-
 class VGG11(nn.Module):
     def __init__(self, num_classes=8, pretrained=True):
         super(VGG11, self).__init__()
@@ -123,3 +68,17 @@ class VGG11(nn.Module):
 
     def forward(self, x):
         return self.backbone(x)
+    
+
+class DummyCNN(nn.Module):
+    def __init__(self, num_classes=8, input_shape=(3, 224, 224)):
+        super(DummyCNN, self).__init__()
+        
+        self.backbone = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(input_shape[2] * input_shape[1] * input_shape[0], num_classes),
+        )
+
+    def forward(self, x):
+        x = self.backbone(x)
+        return x

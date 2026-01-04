@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 from collections import Counter
+import argparse
 
 import torch
 import torch.nn as nn
@@ -31,56 +32,6 @@ import models
 warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
 warnings.filterwarnings("ignore", category=FutureWarning, module="torch")
 warnings.filterwarnings("ignore", category=RuntimeWarning, module="sklearn")
-
-def get_data_loaders(batch_size, dataset: datasets.BaseEmotionDataset, val_split=0.2, num_workers=0):
-    """Create data loaders for training and validation datasets."""
-    # Define transformations
-    
-    transform_train = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ]) 
-    transform_val = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-
-    dataset.transform = transform_train
-    # Split dataset into train and validation sets
-    indices = list(range(len(dataset)))
-    train_indices, val_indices = train_test_split(
-        indices, test_size=val_split, random_state=42, 
-        stratify=[dataset[i][1] for i in indices]
-    )
-
-    oversampler = RandomOverSampler(random_state=42)
-    X_resampled, y_resampled = oversampler.fit_resample(
-        np.array(train_indices).reshape(-1, 1), 
-        [dataset[i][1] for i in train_indices]
-    )
-
-    # Create subset datasets
-    train_dataset = Subset(dataset, X_resampled.flatten())
-    val_dataset = Subset(dataset, val_indices)
-
-    # Update val_dataset to use validation transforms
-    val_dataset.dataset.transform = transform_val
-
-    # Create data loaders
-    train_loader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
-    )
-    val_loader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
-    )
-    print(f"Training samples: {len(train_dataset)}, Validation samples: {len(val_dataset)}")
-    return train_loader, val_loader
-    
     
 # Create wrapper for transforms
 class TransformWrapper:
@@ -325,7 +276,7 @@ def train_model_with_test(model, train_loader, val_loader, test_loader, criterio
         print("-" * 50)
     
     # Final evaluation on test set
-    model = torch.load("best_model_all.pth")
+    model = torch.load("best_model_all.pth", weights_only=False)
     model.eval()
     test_correct = 0
     test_total = 0
@@ -383,9 +334,17 @@ def train_model_with_test(model, train_loader, val_loader, test_loader, criterio
 
 
 def main():
+    parser = argparse.ArgumentParser(description='Training of emotion recognition model.')
+    parser.add_argument('--dummy', action="store_true", help='Use dummy dataset and model for quick testing.')
+    args = parser.parse_args()
+    
     # Configuration
     BATCH_SIZE = 32
-    NUM_EPOCHS = 10
+    if args.dummy:
+        print("Using dummy mode: reduced epochs for quick testing.")
+        NUM_EPOCHS = 2
+    else:
+        NUM_EPOCHS = 10
     LEARNING_RATE = 0.001
     VAL_SPLIT = 0.1
     TEST_SPLIT = 0.1
@@ -398,18 +357,27 @@ def main():
         DEVICE = torch.device("cpu")
     
     print(f"Using device: {DEVICE}")
-
-    all_datasets = [datasets.AffectNetDataset(root_dir="AffectNet"), 
+    
+    if args.dummy:
+        print("Using shrunk dataset and DummyCNN for quick show.")
+        all_datasets = [datasets.NHFIERDataset(root_dir="NHFIER")]
+    else:
+        print("Using full dataset (3 / 3) for training.")
+        all_datasets = [datasets.AffectNetDataset(root_dir="AffectNet"), 
                     datasets.NHFIERDataset(root_dir="NHFIER"),
                     datasets.FER2013Dataset(root_dir="FER-2013")]
     dataset = datasets.combine_datasets(all_datasets)
 
     # Get data loaders
-    # This takes ~5 minutes
+    # This takes ~5 minutes on combined/full dataset
     train_loader, val_loader, test_loader = get_train_validation_test_split_dataloaders(dataset, VAL_SPLIT, TEST_SPLIT, BATCH_SIZE, NUM_WORKERS)
 
     # Initialize model, loss function, and optimizer
-    model = models.EfficientNetB0(pretrained=True)
+    if args.dummy:
+        model = models.DummyCNN(num_classes=8, input_shape=(3, 224, 224))
+    else:
+        model = models.EfficientNetB0(pretrained=True)
+    
     model = model.to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE)
