@@ -32,3 +32,6 @@ __pycache__/
 
 # models
 *.pth
+
+# temp files
+static/training_plot.png
