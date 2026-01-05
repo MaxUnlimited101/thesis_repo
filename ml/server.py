@@ -181,9 +181,9 @@ def generate_plot():
         # Plot loss
         ax_loss = axes[0] if num_plots > 1 else axes
         epochs = range(1, len(training_manager.train_losses) + 1)
-        ax_loss.plot(epochs, training_manager.train_losses, 'b-', label='Train Loss', linewidth=2)
+        ax_loss.plot(epochs, training_manager.train_losses, 'b-o', label='Train Loss', linewidth=2, markersize=6)
         if training_manager.val_losses:
-            ax_loss.plot(epochs, training_manager.val_losses, 'r-', label='Val Loss', linewidth=2)
+            ax_loss.plot(epochs, training_manager.val_losses, 'r-o', label='Val Loss', linewidth=2, markersize=6)
         ax_loss.set_xlabel('Epoch')
         ax_loss.set_ylabel('Loss')
         ax_loss.set_title('Training and Validation Loss')
@@ -194,11 +194,11 @@ def generate_plot():
         if num_plots > 1 and training_manager.train_metrics:
             metric_name = list(training_manager.train_metrics.keys())[0]
             ax_metric = axes[1]
-            ax_metric.plot(epochs, training_manager.train_metrics[metric_name], 'b-', 
-                          label=f'Train {metric_name.title()}', linewidth=2)
+            ax_metric.plot(epochs, training_manager.train_metrics[metric_name], 'b-o', 
+                          label=f'Train {metric_name.title()}', linewidth=2, markersize=6)
             if metric_name in training_manager.val_metrics:
-                ax_metric.plot(epochs, training_manager.val_metrics[metric_name], 'r-',
-                             label=f'Val {metric_name.title()}', linewidth=2)
+                ax_metric.plot(epochs, training_manager.val_metrics[metric_name], 'r-o',
+                             label=f'Val {metric_name.title()}', linewidth=2, markersize=6)
             ax_metric.set_xlabel('Epoch')
             ax_metric.set_ylabel(metric_name.title())
             ax_metric.set_title(f'{metric_name.title()} Progress')
@@ -209,11 +209,11 @@ def generate_plot():
         if num_plots > 2 and len(training_manager.train_metrics) > 1:
             metric_name = list(training_manager.train_metrics.keys())[1]
             ax_metric2 = axes[2]
-            ax_metric2.plot(epochs, training_manager.train_metrics[metric_name], 'b-',
-                           label=f'Train {metric_name.title()}', linewidth=2)
+            ax_metric2.plot(epochs, training_manager.train_metrics[metric_name], 'b-o',
+                           label=f'Train {metric_name.title()}', linewidth=2, markersize=6)
             if metric_name in training_manager.val_metrics:
-                ax_metric2.plot(epochs, training_manager.val_metrics[metric_name], 'r-',
-                              label=f'Val {metric_name.title()}', linewidth=2)
+                ax_metric2.plot(epochs, training_manager.val_metrics[metric_name], 'r-o',
+                              label=f'Val {metric_name.title()}', linewidth=2, markersize=6)
             ax_metric2.set_xlabel('Epoch')
             ax_metric2.set_ylabel(metric_name.title())
             ax_metric2.set_title(f'{metric_name.title()} Progress')
@@ -231,7 +231,12 @@ def train_model(config):
         training_manager.status_message = "Initializing..."
         
         # Set device
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
         print(f"Using device: {device}")
         
         # Data transforms
@@ -245,6 +250,12 @@ def train_model(config):
         training_manager.status_message = "Loading datasets..."
         train_datasets = []
         val_datasets = []
+        test_datasets = []
+        
+        # Get split ratios from config
+        train_split = config.get("train_split", 0.8)
+        val_split = config.get("val_split", 0.1)
+        test_split = config.get("test_split", 0.1)
         
         for dataset_name in config["datasets"]:
             dataset_cls = get_dataset_class(dataset_name)
@@ -253,23 +264,34 @@ def train_model(config):
                     # Check if dataset supports split parameter
                     if dataset_name == "FER-2013":
                         train_ds = dataset_cls(root_dir=dataset_name, split='train', transform=transform)
-                        val_ds = dataset_cls(root_dir=dataset_name, split='test', transform=transform)
+                        # For FER-2013, split test set into val and test
+                        test_full = dataset_cls(root_dir=dataset_name, split='test', transform=transform)
+                        val_size = int(len(test_full) * (val_split / (val_split + test_split)))
+                        test_size = len(test_full) - val_size
+                        val_ds, test_ds = torch.utils.data.random_split(
+                            test_full,
+                            [val_size, test_size],
+                            generator=torch.Generator().manual_seed(42)
+                        )
                     else:
                         # For datasets without splits, use full dataset and split manually
                         full_ds = dataset_cls(root_dir=dataset_name, transform=transform)
                         
-                        # Split 80/20 train/val
-                        train_size = int(0.8 * len(full_ds))
-                        val_size = len(full_ds) - train_size
-                        train_ds, val_ds = torch.utils.data.random_split(
+                        # Split according to config ratios
+                        train_size = int(train_split * len(full_ds))
+                        val_size = int(val_split * len(full_ds))
+                        test_size = len(full_ds) - train_size - val_size
+                        
+                        train_ds, val_ds, test_ds = torch.utils.data.random_split(
                             full_ds, 
-                            [train_size, val_size],
+                            [train_size, val_size, test_size],
                             generator=torch.Generator().manual_seed(42)
                         )
                     
                     train_datasets.append(train_ds)
                     val_datasets.append(val_ds)
-                    print(f"Loaded {dataset_name}: {len(train_ds)} train, {len(val_ds)} val")
+                    test_datasets.append(test_ds)
+                    print(f"Loaded {dataset_name}: {len(train_ds)} train, {len(val_ds)} val, {len(test_ds)} test")
                     
                 except Exception as e:
                     print(f"Error loading {dataset_name}: {e}")
@@ -284,10 +306,15 @@ def train_model(config):
         # Combine datasets
         train_dataset = ConcatDataset(train_datasets) if len(train_datasets) > 1 else train_datasets[0]
         val_dataset = ConcatDataset(val_datasets) if len(val_datasets) > 1 else val_datasets[0]
+        test_dataset = ConcatDataset(test_datasets) if len(test_datasets) > 1 else test_datasets[0]
+        
+        # Get batch size from config
+        batch_size = config.get("batch_size", 32)
         
         # Data loaders
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=2)
-        val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=2)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+        val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
+        test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=2)
         
         # Initialize model
         training_manager.status_message = "Initializing model..."
@@ -299,13 +326,16 @@ def train_model(config):
         
         model = model_cls().to(device)
         
+        # Get learning rate and epochs from config
+        learning_rate = config.get("learning_rate", 0.001)
+        num_epochs = config.get("epochs", 10)
+        
         # Optimizer, scheduler, criterion
-        optimizer = get_optimizer(config["optimizer"], model.parameters())
-        scheduler = get_scheduler(config["scheduler"], optimizer)
+        optimizer = get_optimizer(config["optimizer"], model.parameters(), lr=learning_rate)
+        scheduler = get_scheduler(config["scheduler"], optimizer, num_epochs=num_epochs)
         criterion = get_criterion(config["criterion"])
         
         # Training loop
-        num_epochs = 10  # Default
         training_manager.total_epochs = num_epochs
         
         for epoch in range(num_epochs):

@@ -113,6 +113,20 @@
             border-color: #667eea;
         }
 
+        input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        input[type="number"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
         .submit-btn {
             width: 100%;
             padding: 15px;
@@ -288,6 +302,7 @@
                             <option value="ResNet34">ResNet34</option>
                             <option value="ResNet50">ResNet50</option>
                             <option value="VGG11">VGG11</option>
+                            <option value="MobileNetV2">MobileNetV2</option>
                             <option value="EfficientNetB0">EfficientNetB0</option>
                         </select>
                     </div>
@@ -349,6 +364,41 @@
                             <div class="checkbox-item">
                                 <input type="checkbox" id="metric-roc" name="metrics" value="roc_auc">
                                 <label for="metric-roc">ROC AUC</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Training Parameters -->
+                    <div class="form-group">
+                        <label for="epochs">Number of Epochs</label>
+                        <input type="number" id="epochs" name="epochs" min="1" max="100" value="10" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="learning-rate">Learning Rate</label>
+                        <input type="number" id="learning-rate" name="learning_rate" min="0.0001" max="1" step="0.0001" value="0.001" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="batch-size">Batch Size</label>
+                        <input type="number" id="batch-size" name="batch_size" min="1" max="256" value="32" required>
+                    </div>
+
+                    <!-- Data Split -->
+                    <div class="form-group">
+                        <label>Train/Validation/Test Split</label>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+                            <div>
+                                <label for="train-split" style="font-size: 0.9em; font-weight: normal;">Train</label>
+                                <input type="number" id="train-split" name="train_split" min="0" max="1" step="0.05" value="0.8" required>
+                            </div>
+                            <div>
+                                <label for="val-split" style="font-size: 0.9em; font-weight: normal;">Validation</label>
+                                <input type="number" id="val-split" name="val_split" min="0" max="1" step="0.05" value="0.1" required>
+                            </div>
+                            <div>
+                                <label for="test-split" style="font-size: 0.9em; font-weight: normal;">Test</label>
+                                <input type="number" id="test-split" name="test_split" min="0" max="1" step="0.05" value="0.1" required>
                             </div>
                         </div>
                     </div>
@@ -423,13 +473,30 @@
                 return;
             }
 
+            // Validate splits sum to 1.0
+            const trainSplit = parseFloat(document.getElementById('train-split').value);
+            const valSplit = parseFloat(document.getElementById('val-split').value);
+            const testSplit = parseFloat(document.getElementById('test-split').value);
+            const splitSum = trainSplit + valSplit + testSplit;
+            
+            if (Math.abs(splitSum - 1.0) > 0.01) {
+                showMessage('Train, Validation, and Test splits must sum to 1.0', 'error');
+                return;
+            }
+
             const config = {
                 datasets: datasets,
                 model: document.getElementById('model-arch').value,
                 optimizer: document.getElementById('optimizer').value,
                 scheduler: document.getElementById('scheduler').value,
                 criterion: document.getElementById('criterion').value,
-                metrics: metrics
+                metrics: metrics,
+                epochs: parseInt(document.getElementById('epochs').value),
+                learning_rate: parseFloat(document.getElementById('learning-rate').value),
+                batch_size: parseInt(document.getElementById('batch-size').value),
+                train_split: parseFloat(document.getElementById('train-split').value),
+                val_split: parseFloat(document.getElementById('val-split').value),
+                test_split: parseFloat(document.getElementById('test-split').value)
             };
 
             // Disable form
