@@ -8,6 +8,8 @@ from asyncio import Lock
 import time
 import os
 from fastapi.responses import FileResponse
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import defaultdict
@@ -138,13 +140,13 @@ async def generate_plot(student_id: str = None, cumulative: bool = False):
         ax.stackplot(time_indices, *emotion_arrays, labels=emotion_keys, colors=color_list, alpha=0.8)
         
         # Customize the plot
-        ax.set_xlabel('Time (session index)', fontsize=12)
+        ax.set_xlabel('Reading index', fontsize=12)
         ylabel = 'Cumulative Emotion Count' if cumulative else 'Emotion Probability'
         ax.set_ylabel(ylabel, fontsize=12)
 
         title_suffix = f" - {student_id}" if student_id else " - All Students"
         title_prefix = "Cumulative " if cumulative else ""
-        ax.set_title(f'{title_prefix}Emotion Distribution Over Time{title_suffix}', fontsize=14, pad=20)
+        ax.set_title(f'{title_prefix}Emotion Distribution Over Readings{title_suffix}', fontsize=14, pad=20)
         
         if not cumulative:
             ax.set_ylim(0, 1)
