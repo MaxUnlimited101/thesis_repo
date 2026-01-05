@@ -153,6 +153,7 @@ def train_model_with_test(model, train_loader, val_loader, test_loader, criterio
             train_probabilities.extend(probabilities.detach().cpu().numpy())
 
         # Update scheduler after epoch
+        lr_now = scheduler.get_last_lr()[0]
         scheduler.step()
         
         # Calculate training metrics
@@ -257,7 +258,7 @@ def train_model_with_test(model, train_loader, val_loader, test_loader, criterio
         print(f"Epoch [{epoch+1}/{num_epochs}]")
         print(f"  Train - Loss: {train_loss:.4f}, Acc: {train_acc:.4f}, F1: {train_f1:.4f}, Prec: {train_precision:.4f}, ROC-AUC: {train_roc_auc:.4f}")
         print(f"  Val   - Loss: {val_loss:.4f}, Acc: {val_acc:.4f}, F1: {val_f1:.4f}, Prec: {val_precision:.4f}, ROC-AUC: {val_roc_auc:.4f}")
-        print(f"  LR: {scheduler.get_last_lr()[0]:.6f}")
+        print(f"  LR: {lr_now:.6f}")
         
         # Save best model
         if val_acc > best_val_acc:
