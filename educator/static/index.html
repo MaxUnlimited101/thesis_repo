@@ -311,10 +311,11 @@
             const errorDiv = document.getElementById('errorMessage');
             const studentId = document.getElementById('studentSelect').value;
             const graphType = document.getElementById('graphTypeSelect').value;
+            const smallLoader = document.getElementById('smallLoader');
             
-            loading.style.display = 'block';
-            plotImg.style.display = 'none';
-            errorDiv.style.display = 'none';
+            //loading.style.display = 'block';
+            //plotImg.style.display = 'none';
+            //errorDiv.style.display = 'none';
             
                 try {
                     const url = (studentId 
@@ -323,9 +324,7 @@
                         + `&type=${graphType}`;
 
                     // Show small loader while new image is loading, keep old image visible
-                    const smallLoader = document.getElementById('smallLoader');
                     smallLoader.style.display = 'inline-block';
-                    errorDiv.style.display = 'none';
 
                     // Load new image in background
                     const loader = new Image();
@@ -335,6 +334,7 @@
                         plotImg.style.display = 'block';
                         loading.style.display = 'none';
                         smallLoader.style.display = 'none';
+                        errorDiv.style.display = 'none';
                         updateLastUpdateTime();
                     };
                     loader.onerror = () => {
