@@ -37,7 +37,7 @@ class TrainingManager:
         self.train_metrics = defaultdict(list)
         self.val_metrics = defaultdict(list)
         self.config = {}
-        self.plot_path = "static/training_plot.png"
+        self.plot_paths = []  # List of plot file paths
         self.model_path = "static/trained_model.pth"
         self.status_message = "Idle"
         self.lock = threading.Lock()
@@ -65,7 +65,7 @@ class TrainingManager:
                 "total_epochs": self.total_epochs,
                 "best_accuracy": self.best_accuracy,
                 "complete": not self.is_training and self.current_epoch > 0,
-                "plot_url": f"/static/training_plot.png" if os.path.exists(self.plot_path) else None
+                "plot_urls": [f"/static/{Path(p).name}" for p in self.plot_paths if os.path.exists(p)]
             }
 
 # Global training manager
@@ -164,71 +164,76 @@ def calculate_metrics(y_true, y_pred, y_prob, metric_names):
 
 
 def generate_plot():
-    """Generate training progress plot"""
+    """Generate training progress plots - creates multiple images if needed"""
     with training_manager.lock:
         if not training_manager.train_losses:
             return
         
-        # Determine number of subplots needed
-        num_metrics = len(training_manager.train_metrics)
-        num_plots = 1 + num_metrics  # Loss + each metric
-        
-        fig, axes = plt.subplots(1, min(num_plots, 3), figsize=(15, 5))
-        if num_plots == 1:
-            axes = [axes]
-        elif num_plots == 2:
-            axes = [axes]
-        
-        # Plot loss
-        ax_loss = axes[0] if num_plots > 1 else axes
+        training_manager.plot_paths = []  # Reset plot paths
         epochs = range(1, len(training_manager.train_losses) + 1)
-        ax_loss.plot(epochs, training_manager.train_losses, 'b-o', label='Train Loss', linewidth=2, markersize=6)
-        if training_manager.val_losses:
-            ax_loss.plot(epochs, training_manager.val_losses, 'r-o', label='Val Loss', linewidth=2, markersize=6)
-        ax_loss.set_xlabel('Epoch')
-        ax_loss.set_ylabel('Loss')
-        ax_loss.set_title('Training and Validation Loss')
-        ax_loss.legend()
-        ax_loss.grid(True, alpha=0.3)
         
-        # Plot first metric (usually accuracy)
-        if num_plots > 1 and training_manager.train_metrics:
-            metric_name = list(training_manager.train_metrics.keys())[0]
-            ax_metric = axes[1]
-            ax_metric.plot(epochs, training_manager.train_metrics[metric_name], 'b-o', 
-                          label=f'Train {metric_name.title()}', linewidth=2, markersize=6)
-            if metric_name in training_manager.val_metrics:
-                ax_metric.plot(epochs, training_manager.val_metrics[metric_name], 'r-o',
-                             label=f'Val {metric_name.title()}', linewidth=2, markersize=6)
-            ax_metric.set_xlabel('Epoch')
-            ax_metric.set_ylabel(metric_name.title())
-            ax_metric.set_title(f'{metric_name.title()} Progress')
-            ax_metric.legend()
-            ax_metric.grid(True, alpha=0.3)
+        # Collect all plots to generate: loss + all metrics
+        plots_to_generate = [("loss", None)]  # (plot_type, metric_name)
+        for metric_name in training_manager.train_metrics.keys():
+            plots_to_generate.append(("metric", metric_name))
         
-        # Plot second metric if available
-        if num_plots > 2 and len(training_manager.train_metrics) > 1:
-            metric_name = list(training_manager.train_metrics.keys())[1]
-            ax_metric2 = axes[2]
-            ax_metric2.plot(epochs, training_manager.train_metrics[metric_name], 'b-o',
+        # Generate plots in groups of 2 per image
+        plots_per_image = 2
+        num_images = (len(plots_to_generate) + plots_per_image - 1) // plots_per_image
+        
+        for img_idx in range(num_images):
+            start_idx = img_idx * plots_per_image
+            end_idx = min(start_idx + plots_per_image, len(plots_to_generate))
+            plots_in_this_image = plots_to_generate[start_idx:end_idx]
+            
+            # Create figure with appropriate number of subplots
+            fig, axes = plt.subplots(1, len(plots_in_this_image), figsize=(10 * len(plots_in_this_image), 5))
+            if len(plots_in_this_image) == 1:
+                axes = [axes]
+            
+            # Generate each subplot
+            for ax_idx, (plot_type, metric_name) in enumerate(plots_in_this_image):
+                ax = axes[ax_idx]
+                
+                if plot_type == "loss":
+                    # Plot loss
+                    ax.plot(epochs, training_manager.train_losses, 'b-o', label='Train Loss', linewidth=2, markersize=6)
+                    if training_manager.val_losses:
+                        ax.plot(epochs, training_manager.val_losses, 'r-o', label='Val Loss', linewidth=2, markersize=6)
+                    ax.set_xlabel('Epoch')
+                    ax.set_ylabel('Loss')
+                    ax.set_title('Training and Validation Loss')
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+                else:
+                    # Plot metric
+                    ax.plot(epochs, training_manager.train_metrics[metric_name], 'b-o',
                            label=f'Train {metric_name.title()}', linewidth=2, markersize=6)
-            if metric_name in training_manager.val_metrics:
-                ax_metric2.plot(epochs, training_manager.val_metrics[metric_name], 'r-o',
-                              label=f'Val {metric_name.title()}', linewidth=2, markersize=6)
-            ax_metric2.set_xlabel('Epoch')
-            ax_metric2.set_ylabel(metric_name.title())
-            ax_metric2.set_title(f'{metric_name.title()} Progress')
-            ax_metric2.legend()
-            ax_metric2.grid(True, alpha=0.3)
-        
-        plt.tight_layout()
-        plt.savefig(training_manager.plot_path, dpi=100, bbox_inches='tight')
-        plt.close()
+                    if metric_name in training_manager.val_metrics:
+                        ax.plot(epochs, training_manager.val_metrics[metric_name], 'r-o',
+                               label=f'Val {metric_name.title()}', linewidth=2, markersize=6)
+                    ax.set_xlabel('Epoch')
+                    ax.set_ylabel(metric_name.title())
+                    ax.set_title(f'{metric_name.title()} Progress')
+                    ax.legend()
+                    ax.grid(True, alpha=0.3)
+            
+            plt.tight_layout()
+            plot_path = f"static/training_plot_{img_idx + 1}.png"
+            plt.savefig(plot_path, dpi=100, bbox_inches='tight')
+            plt.close()
+            
+            training_manager.plot_paths.append(plot_path)
 
 
 def train_model(config):
     """Main training function"""
-    os.remove(training_manager.plot_path) if os.path.exists(training_manager.plot_path) else None
+    # Remove old plot files
+    for old_plot in Path("static").glob("training_plot_*.png"):
+        try:
+            old_plot.unlink()
+        except:
+            pass
     try:
         training_manager.status_message = "Initializing..."
         

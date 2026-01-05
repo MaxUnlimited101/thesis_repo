@@ -130,7 +130,7 @@
         .submit-btn {
             width: 100%;
             padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #2196f3;
             color: white;
             border: none;
             border-radius: 8px;
@@ -442,7 +442,9 @@
 
                 <div class="plot-container">
                     <div class="loading" id="plotLoading"></div>
-                    <img id="trainingPlot" src="" alt="Training Progress Plot" style="display: none;">
+                    <div id="trainingPlots" style="display: none;">
+                        <!-- Plot images will be dynamically added here -->
+                    </div>
                 </div>
 
                 <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -595,14 +597,25 @@
             document.getElementById('bestAccuracy').textContent = 
                 status.best_accuracy ? `${(status.best_accuracy * 100).toFixed(2)}%` : 'N/A';
 
-            // Update plot
-            if (status.plot_url) {
-                const plotImg = document.getElementById('trainingPlot');
+            // Update plots
+            if (status.plot_urls && status.plot_urls.length > 0) {
+                const plotsContainer = document.getElementById('trainingPlots');
                 const loading = document.getElementById('plotLoading');
                 
-                // Add timestamp to avoid caching
-                plotImg.src = `${status.plot_url}?t=${Date.now()}`;
-                plotImg.style.display = 'block';
+                // Clear existing plots
+                plotsContainer.innerHTML = '';
+                
+                // Add each plot image
+                status.plot_urls.forEach((url, index) => {
+                    const img = document.createElement('img');
+                    img.src = `${url}?t=${Date.now()}`;
+                    img.alt = `Training Progress Plot ${index + 1}`;
+                    img.style.width = '100%';
+                    img.style.marginBottom = '15px';
+                    plotsContainer.appendChild(img);
+                });
+                
+                plotsContainer.style.display = 'block';
                 loading.style.display = 'none';
             }
         }

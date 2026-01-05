@@ -34,4 +34,4 @@ __pycache__/
 *.pth
 
 # temp files
-static/training_plot.png
+static/training_plot*
