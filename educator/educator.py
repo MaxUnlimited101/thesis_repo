@@ -1,4 +1,3 @@
-# receiver_app.py
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 import uvicorn

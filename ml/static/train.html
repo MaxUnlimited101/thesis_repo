@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Training</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .config-section {
+            grid-column: 1 / -1;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .checkbox-group, .radio-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .checkbox-item, .radio-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-item input[type="checkbox"],
+        .radio-item input[type="radio"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-item label,
+        .radio-item label {
+            margin: 0;
+            font-weight: normal;
+            font-size: 0.95em;
+            cursor: pointer;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .training-section {
+            grid-column: 1 / -1;
+            display: none;
+            margin-top: 30px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .training-section.active {
+            display: block;
+        }
+
+        .training-section h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .status-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .status-card h3 {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .status-card p {
+            font-size: 1.5em;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .plot-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .plot-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #c33;
+        }
+
+        .success-message {
+            background: #efe;
+            color: #3c3;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #3c3;
+        }
+
+        .stop-btn {
+            padding: 10px 20px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .stop-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Model Training dashboard</h1>
+            <p>Configure and train your custom emotion recognition model</p>
+        </div>
+
+        <div class="content">
+            <div class="config-section">
+                <form id="trainingForm">
+                    <!-- Dataset Selection -->
+                    <div class="form-group">
+                        <label>Select Dataset(s)</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="dataset-affectnet" name="datasets" value="AffectNet">
+                                <label for="dataset-affectnet">AffectNet</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="dataset-fer2013" name="datasets" value="FER-2013">
+                                <label for="dataset-fer2013">FER-2013</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="dataset-nhfier" name="datasets" value="NHFIER">
+                                <label for="dataset-nhfier">NHFIER</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Model Architecture -->
+                    <div class="form-group">
+                        <label for="model-arch">Model Architecture</label>
+                        <select id="model-arch" name="model" required>
+                            <option value="">-- Select Model --</option>
+                            <option value="DummyCNN">DummyCNN</option>
+                            <option value="ResNet18">ResNet18</option>
+                            <option value="ResNet34">ResNet34</option>
+                            <option value="ResNet50">ResNet50</option>
+                            <option value="VGG11">VGG11</option>
+                            <option value="EfficientNetB0">EfficientNetB0</option>
+                        </select>
+                    </div>
+
+                    <!-- Optimizer -->
+                    <div class="form-group">
+                        <label for="optimizer">Optimizer</label>
+                        <select id="optimizer" name="optimizer" required>
+                            <option value="">-- Select Optimizer --</option>
+                            <option value="Adam">Adam</option>
+                            <option value="SGD">SGD (Stochastic Gradient Descent)</option>
+                            <option value="AdamW">AdamW</option>
+                            <option value="RMSprop">RMSprop</option>
+                            <option value="Adagrad">Adagrad</option>
+                        </select>
+                    </div>
+
+                    <!-- Scheduler -->
+                    <div class="form-group">
+                        <label for="scheduler">Learning Rate Scheduler</label>
+                        <select id="scheduler" name="scheduler" required>
+                            <option value="">-- Select Scheduler --</option>
+                            <option value="StepLR">StepLR</option>
+                            <option value="ReduceLROnPlateau">ReduceLROnPlateau</option>
+                            <option value="CosineAnnealingLR">CosineAnnealingLR</option>
+                            <option value="ExponentialLR">ExponentialLR</option>
+                            <option value="CyclicLR">CyclicLR</option>
+                            <option value="OneCycleLR">OneCycleLR</option>
+                        </select>
+                    </div>
+
+                    <!-- Criterion (Loss Function) -->
+                    <div class="form-group">
+                        <label for="criterion">Loss Function (Criterion)</label>
+                        <select id="criterion" name="criterion" required>
+                            <option value="">-- Select Criterion --</option>
+                            <option value="CrossEntropyLoss">CrossEntropyLoss</option>
+                            <option value="NLLLoss">NLLLoss (Negative Log Likelihood)</option>
+                            <option value="LabelSmoothingCrossEntropy">Label Smoothing CrossEntropy</option>
+                        </select>
+                    </div>
+
+                    <!-- Metrics -->
+                    <div class="form-group">
+                        <label>Evaluation Metrics</label>
+                        <div class="checkbox-group">
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="metric-accuracy" name="metrics" value="accuracy" checked>
+                                <label for="metric-accuracy">Accuracy</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="metric-precision" name="metrics" value="precision">
+                                <label for="metric-precision">Precision</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="metric-f1" name="metrics" value="f1">
+                                <label for="metric-f1">F1-Score</label>
+                            </div>
+                            <div class="checkbox-item">
+                                <input type="checkbox" id="metric-roc" name="metrics" value="roc_auc">
+                                <label for="metric-roc">ROC AUC</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">Start Training</button>
+                </form>
+            </div>
+
+            <!-- Training Section (Hidden Initially) -->
+            <div class="training-section" id="trainingSection">
+                <h2>Training Progress</h2>
+                
+                <div id="messageContainer"></div>
+
+                <div class="status-info">
+                    <div class="status-card">
+                        <h3>Status</h3>
+                        <p id="trainingStatus">Initializing...</p>
+                    </div>
+                    <div class="status-card">
+                        <h3>Current Epoch</h3>
+                        <p id="currentEpoch">0/0</p>
+                    </div>
+                    <div class="status-card">
+                        <h3>Best Accuracy</h3>
+                        <p id="bestAccuracy">N/A</p>
+                    </div>
+                    <div class="status-card">
+                        <h3>Training Time</h3>
+                        <p id="trainingTime">0s</p>
+                    </div>
+                </div>
+
+                <div class="plot-container">
+                    <div class="loading" id="plotLoading"></div>
+                    <img id="trainingPlot" src="" alt="Training Progress Plot" style="display: none;">
+                </div>
+
+                <button class="stop-btn" id="stopTraining">Stop Training</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pollingInterval = null;
+        let trainingStartTime = null;
+        let timerInterval = null;
+
+        const form = document.getElementById('trainingForm');
+        const trainingSection = document.getElementById('trainingSection');
+        const submitBtn = form.querySelector('.submit-btn');
+        const messageContainer = document.getElementById('messageContainer');
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // Collect form data
+            const datasets = Array.from(document.querySelectorAll('input[name="datasets"]:checked'))
+                .map(cb => cb.value);
+            
+            if (datasets.length === 0) {
+                showMessage('Please select at least one dataset', 'error');
+                return;
+            }
+
+            const metrics = Array.from(document.querySelectorAll('input[name="metrics"]:checked'))
+                .map(cb => cb.value);
+            
+            if (metrics.length === 0) {
+                showMessage('Please select at least one metric', 'error');
+                return;
+            }
+
+            const config = {
+                datasets: datasets,
+                model: document.getElementById('model-arch').value,
+                optimizer: document.getElementById('optimizer').value,
+                scheduler: document.getElementById('scheduler').value,
+                criterion: document.getElementById('criterion').value,
+                metrics: metrics
+            };
+
+            // Disable form
+            submitBtn.disabled = true;
+            submitBtn.textContent = '🔄 Starting Training...';
+
+            try {
+                // Send training request to server
+                const response = await fetch('/train/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    showMessage('Training started successfully!', 'success');
+                    startTrainingMonitoring();
+                } else {
+                    showMessage(`Error: ${result.error || 'Failed to start training'}`, 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Start Training';
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Start Training';
+            }
+        });
+
+        // Start monitoring training progress
+        function startTrainingMonitoring() {
+            trainingSection.classList.add('active');
+            trainingStartTime = Date.now();
+            
+            // Update timer
+            timerInterval = setInterval(updateTimer, 1000);
+            
+            // Start polling for plot updates
+            pollTrainingProgress();
+            pollingInterval = setInterval(pollTrainingProgress, 3000); // Poll every 3 seconds
+        }
+
+        // Poll training progress from server
+        async function pollTrainingProgress() {
+            try {
+                const response = await fetch('/train/status');
+                const status = await response.json();
+
+                if (response.ok) {
+                    updateTrainingUI(status);
+                    
+                    // Check if training is complete
+                    if (status.complete) {
+                        stopMonitoring();
+                        showMessage('Training completed successfully!', 'success');
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Start Training';
+                    }
+                } else {
+                    console.error('Failed to fetch training status');
+                }
+            } catch (error) {
+                console.error('Error polling training status:', error);
+            }
+        }
+
+        // Update UI with training status
+        function updateTrainingUI(status) {
+            // Update status info
+            document.getElementById('trainingStatus').textContent = status.status || 'Training...';
+            document.getElementById('currentEpoch').textContent = 
+                `${status.current_epoch || 0}/${status.total_epochs || 0}`;
+            document.getElementById('bestAccuracy').textContent = 
+                status.best_accuracy ? `${(status.best_accuracy * 100).toFixed(2)}%` : 'N/A';
+
+            // Update plot
+            if (status.plot_url) {
+                const plotImg = document.getElementById('trainingPlot');
+                const loading = document.getElementById('plotLoading');
+                
+                // Add timestamp to avoid caching
+                plotImg.src = `${status.plot_url}?t=${Date.now()}`;
+                plotImg.style.display = 'block';
+                loading.style.display = 'none';
+            }
+        }
+
+        // Update training timer
+        function updateTimer() {
+            if (!trainingStartTime) return;
+            
+            const elapsed = Math.floor((Date.now() - trainingStartTime) / 1000);
+            const hours = Math.floor(elapsed / 3600);
+            const minutes = Math.floor((elapsed % 3600) / 60);
+            const seconds = elapsed % 60;
+            
+            const timeStr = hours > 0 
+                ? `${hours}h ${minutes}m ${seconds}s`
+                : minutes > 0
+                    ? `${minutes}m ${seconds}s`
+                    : `${seconds}s`;
+            
+            document.getElementById('trainingTime').textContent = timeStr;
+        }
+
+        // Stop monitoring
+        function stopMonitoring() {
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+                pollingInterval = null;
+            }
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+        }
+
+        // Stop training button
+        document.getElementById('stopTraining').addEventListener('click', async () => {
+            if (confirm('Are you sure you want to stop training?')) {
+                try {
+                    const response = await fetch('/train/stop', { method: 'POST' });
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showMessage('Training stopped', 'success');
+                        stopMonitoring();
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = 'Start Training';
+                    } else {
+                        showMessage(`Error: ${result.error}`, 'error');
+                    }
+                } catch (error) {
+                    showMessage(`Error: ${error.message}`, 'error');
+                }
+            }
+        });
+
+        // Show message helper
+        function showMessage(text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = text;
+            
+            messageContainer.innerHTML = '';
+            messageContainer.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            stopMonitoring();
+        });
+    </script>
+</body>
+</html>
