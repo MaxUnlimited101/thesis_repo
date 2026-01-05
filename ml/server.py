@@ -38,6 +38,7 @@ class TrainingManager:
         self.val_metrics = defaultdict(list)
         self.config = {}
         self.plot_path = "static/training_plot.png"
+        self.model_path = "static/trained_model.pth"
         self.status_message = "Idle"
         self.lock = threading.Lock()
         
@@ -114,15 +115,15 @@ def get_optimizer(optimizer_name, model_params, lr=0.001):
     return optimizer_cls(model_params, lr=lr)
 
 
-def get_scheduler(scheduler_name, optimizer, num_epochs=10):
+def get_scheduler(scheduler_name, optimizer, num_epochs=10, lr=0.001):
     """Get learning rate scheduler"""
     scheduler_map = {
         "StepLR": lambda: optim.lr_scheduler.StepLR(optimizer, step_size=num_epochs//3, gamma=0.1),
         "ReduceLROnPlateau": lambda: optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=3),
         "CosineAnnealingLR": lambda: optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs),
         "ExponentialLR": lambda: optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9),
-        "CyclicLR": lambda: optim.lr_scheduler.CyclicLR(optimizer, base_lr=0.0001, max_lr=0.01, step_size_up=5),
-        "OneCycleLR": lambda: optim.lr_scheduler.OneCycleLR(optimizer, max_lr=0.01, epochs=num_epochs, steps_per_epoch=100)
+        "CyclicLR": lambda: optim.lr_scheduler.CyclicLR(optimizer, base_lr=lr/2, max_lr=lr, step_size_up=5),
+        "OneCycleLR": lambda: optim.lr_scheduler.OneCycleLR(optimizer, max_lr=lr, epochs=num_epochs, steps_per_epoch=100)
     }
     
     scheduler_fn = scheduler_map.get(scheduler_name)
@@ -227,6 +228,7 @@ def generate_plot():
 
 def train_model(config):
     """Main training function"""
+    os.remove(training_manager.plot_path) if os.path.exists(training_manager.plot_path) else None
     try:
         training_manager.status_message = "Initializing..."
         
@@ -332,7 +334,7 @@ def train_model(config):
         
         # Optimizer, scheduler, criterion
         optimizer = get_optimizer(config["optimizer"], model.parameters(), lr=learning_rate)
-        scheduler = get_scheduler(config["scheduler"], optimizer, num_epochs=num_epochs)
+        scheduler = get_scheduler(config["scheduler"], optimizer, num_epochs=num_epochs, lr=learning_rate)
         criterion = get_criterion(config["criterion"])
         
         # Training loop
@@ -424,6 +426,9 @@ def train_model(config):
             if "accuracy" in val_metrics:
                 if val_metrics["accuracy"] > training_manager.best_accuracy:
                     training_manager.best_accuracy = val_metrics["accuracy"]
+                    # Save best model
+                    torch.save(model, training_manager.model_path)
+                    print(f"Saved best model with accuracy: {training_manager.best_accuracy:.4f}")
             
             # Update scheduler
             if scheduler:
@@ -438,6 +443,11 @@ def train_model(config):
             print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
             if "accuracy" in val_metrics:
                 print(f"Val Accuracy: {val_metrics['accuracy']:.4f}")
+        
+        # Save final model if not already saved
+        if not os.path.exists(training_manager.model_path):
+            torch.save(model, training_manager.model_path)
+            print(f"Saved final model")
         
         training_manager.status_message = "Training completed"
         training_manager.is_training = False
@@ -505,6 +515,22 @@ async def stop_training():
     
     training_manager.should_stop = True
     return JSONResponse(content={"message": "Stopping training..."})
+
+
+@app.get("/train/download")
+async def download_model():
+    """Download the trained model"""
+    if not os.path.exists(training_manager.model_path):
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Model file not found"}
+        )
+    
+    return FileResponse(
+        path=training_manager.model_path,
+        filename="trained_model.pth",
+        media_type="application/octet-stream"
+    )
 
 
 @app.get("/health")

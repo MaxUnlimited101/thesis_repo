@@ -28,7 +28,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background-color: #2196f3;
             color: white;
             padding: 30px;
             text-align: center;
@@ -261,6 +261,14 @@
         .stop-btn:hover {
             background: #c82333;
         }
+
+        .stop-btn#downloadModel {
+            background: #28a745;
+        }
+
+        .stop-btn#downloadModel:hover {
+            background: #218838;
+        }
     </style>
 </head>
 <body>
@@ -314,7 +322,7 @@
                             <option value="">-- Select Optimizer --</option>
                             <option value="Adam">Adam</option>
                             <option value="SGD">SGD (Stochastic Gradient Descent)</option>
-                            <option value="AdamW">AdamW</option>
+                            <option value="AdamW" selected>AdamW</option>
                             <option value="RMSprop">RMSprop</option>
                             <option value="Adagrad">Adagrad</option>
                         </select>
@@ -327,7 +335,7 @@
                             <option value="">-- Select Scheduler --</option>
                             <option value="StepLR">StepLR</option>
                             <option value="ReduceLROnPlateau">ReduceLROnPlateau</option>
-                            <option value="CosineAnnealingLR">CosineAnnealingLR</option>
+                            <option value="CosineAnnealingLR" selected>CosineAnnealingLR</option>
                             <option value="ExponentialLR">ExponentialLR</option>
                             <option value="CyclicLR">CyclicLR</option>
                             <option value="OneCycleLR">OneCycleLR</option>
@@ -339,7 +347,7 @@
                         <label for="criterion">Loss Function (Criterion)</label>
                         <select id="criterion" name="criterion" required>
                             <option value="">-- Select Criterion --</option>
-                            <option value="CrossEntropyLoss">CrossEntropyLoss</option>
+                            <option value="CrossEntropyLoss" selected>CrossEntropyLoss</option>
                             <option value="NLLLoss">NLLLoss (Negative Log Likelihood)</option>
                             <option value="LabelSmoothingCrossEntropy">Label Smoothing CrossEntropy</option>
                         </select>
@@ -437,7 +445,10 @@
                     <img id="trainingPlot" src="" alt="Training Progress Plot" style="display: none;">
                 </div>
 
-                <button class="stop-btn" id="stopTraining">Stop Training</button>
+                <div style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button class="stop-btn" id="stopTraining">Stop Training</button>
+                    <button class="stop-btn" id="downloadModel" style="background: #28a745; display: none;">Download Model</button>
+                </div>
             </div>
         </div>
     </div>
@@ -535,6 +546,10 @@
             trainingSection.classList.add('active');
             trainingStartTime = Date.now();
             
+            // Reset button states
+            document.getElementById('stopTraining').style.display = 'inline-block';
+            document.getElementById('downloadModel').style.display = 'none';
+            
             // Update timer
             timerInterval = setInterval(updateTimer, 1000);
             
@@ -558,6 +573,10 @@
                         showMessage('Training completed successfully!', 'success');
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Start Training';
+                        
+                        // Show download button and hide stop button
+                        document.getElementById('stopTraining').style.display = 'none';
+                        document.getElementById('downloadModel').style.display = 'inline-block';
                     }
                 } else {
                     console.error('Failed to fetch training status');
@@ -636,6 +655,31 @@
                 } catch (error) {
                     showMessage(`Error: ${error.message}`, 'error');
                 }
+            }
+        });
+
+        // Download model button
+        document.getElementById('downloadModel').addEventListener('click', async () => {
+            try {
+                const response = await fetch('/train/download');
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'trained_model.pth';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                    showMessage('Model downloaded successfully!', 'success');
+                } else {
+                    const result = await response.json();
+                    showMessage(`Error: ${result.error || 'Failed to download model'}`, 'error');
+                }
+            } catch (error) {
+                showMessage(`Error: ${error.message}`, 'error');
             }
         });
 
