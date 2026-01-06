@@ -227,6 +227,36 @@
             color: #888;
             font-size: 14px;
         }
+
+        .back-button {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: rgba(255, 255, 255, 0.95);
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .back-button:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .back-button:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -281,6 +311,11 @@
             <h2>Active Students</h2>
             <div id="studentsList"></div>
         </div>
+
+        <button class="back-button" onclick="window.history.back()">
+            <span>←</span>
+            <span>Back</span>
+        </button>
     </div>
 
     <script>
