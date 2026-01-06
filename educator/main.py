@@ -794,6 +794,9 @@ def train_model(config):
             train_probs = []
             
             for batch_idx, (inputs, labels) in enumerate(train_loader):
+                if training_manager.should_stop:
+                    training_manager.status_message = "Training stopped by user"
+                    break
                 inputs, labels = inputs.to(device), labels.to(device)
                 
                 optimizer.zero_grad()
