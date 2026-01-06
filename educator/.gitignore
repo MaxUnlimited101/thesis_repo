@@ -32,6 +32,7 @@ __pycache__/
 
 # models
 *.pth
+!model_efb0.pth
 
 # temp files
 static/training_plot*
