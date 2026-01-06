@@ -596,7 +596,7 @@ def calculate_metrics(y_true, y_pred, y_prob, metric_names):
     return metrics, accuracy
 
 
-def generate_plot():
+def generate_plot_for_train():
     """Generate training progress plots - creates multiple images if needed"""
     with training_manager.lock:
         if not training_manager.train_losses:
@@ -878,7 +878,7 @@ def train_model(config):
                     scheduler.step()
             
             # Generate plot
-            generate_plot()
+            generate_plot_for_train()
             
             print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
             print(f"Val Accuracy: {val_accuracy:.4f}")
