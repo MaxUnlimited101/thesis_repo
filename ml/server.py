@@ -20,7 +20,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, ConcatDataset
 from torchvision import transforms
-from sklearn.metrics import precision_score, f1_score, roc_auc_score
+from sklearn.metrics import precision_score, f1_score, roc_auc_score, accuracy_score
 import threading
 from pathlib import Path
 
@@ -145,8 +145,8 @@ def calculate_metrics(y_true, y_pred, y_prob, metric_names):
     """Calculate specified metrics"""
     metrics = {}
     
-    if "accuracy" in metric_names:
-        metrics["accuracy"] = (y_true == y_pred).sum() / len(y_true)
+    # always calculate accuracy
+    metrics["accuracy"] = accuracy_score(y_true, y_pred)
     
     if "precision" in metric_names:
         metrics["precision"] = precision_score(y_true, y_pred, average='weighted', zero_division=0)
