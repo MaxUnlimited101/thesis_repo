@@ -255,6 +255,10 @@
             word-break: break-all;
         }
 
+        .tunnel-url-text.error {
+            color: #dc3545;
+        }
+
         .copy-button {
             margin-top: 10px;
             padding: 8px 15px;
@@ -269,6 +273,12 @@
 
         .copy-button:hover {
             background: #5568d3;
+        }
+
+        .copy-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
         }
 
         .status-message {
@@ -310,8 +320,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 Emotion Monitoring System</h1>
-            <p class="subtitle">Choose your role to get started</p>
+            <h1>Emotion Monitoring System</h1>
+            <p class="subtitle">Choose an option to get started</p>
         </div>
 
         <div class="cards-container">
@@ -333,6 +343,26 @@
                     Your emotion data will be sent securely for analysis.
                 </div>
                 <button class="mode-button">Start as Student</button>
+            </div>
+
+            <div class="mode-card" onclick="showTrainModal()">
+                <div class="mode-icon">🧠</div>
+                <div class="mode-title">Train FER Model</div>
+                <div class="mode-description">
+                    Train your own Facial Emotion Recognition model using custom datasets. 
+                    Fine-tune parameters and evaluate performance.
+                </div>
+                <button class="mode-button">Train Model</button>
+            </div>
+
+            <div class="mode-card" onclick="showAboutModal()">
+                <div class="mode-icon">ℹ️</div>
+                <div class="mode-title">About This Program</div>
+                <div class="mode-description">
+                    Learn more about the Emotion Monitoring System, its features, 
+                    and how it helps improve online learning experiences.
+                </div>
+                <button class="mode-button">Learn More</button>
             </div>
         </div>
     </div>
@@ -392,6 +422,74 @@
         </div>
     </div>
 
+    <div id="trainModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🧠 Train FER Model</div>
+            <div class="modal-description">
+                Train a custom Facial Emotion Recognition model using your own datasets. 
+                This process will use machine learning to create a model that can recognize emotions from facial expressions.
+            </div>
+
+            <div class="form-group">
+                <label>Available Datasets:</label>
+                <div style="margin-top: 10px; color: #666; font-size: 14px;">
+                    • FER-2013: 30,000+ grayscale images<br>
+                    • AffectNet: Large-scale emotion dataset<br>
+                    • NHFIER: Natural Human Face Images with Emotions dataset<br>
+                </div>
+            </div>
+
+            <div class="status-message" id="trainStatus"></div>
+
+            <div class="modal-buttons">
+                <button class="modal-button secondary" onclick="closeTrainModal()">Close</button>
+                <button class="modal-button primary" onclick="openTrainingInterface()">
+                    Open Training Interface
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">ℹ️ About This Program</div>
+            <div class="modal-description">
+                The Emotion Monitoring System is designed to enhance online learning experiences by providing 
+                real-time emotion analytics during classes.
+            </div>
+
+            <div class="form-group" >
+                <label>Authors:</label>
+                <div style="margin-top: 10px; color: #666; font-size: 14px;">
+                    • Maksym Nosal<br>
+                    • Maciej Sosnowski<br>
+                    • Oleksandr Shkil<br>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 20px;">
+                <label>Technology Stack:</label>
+                <div style="margin-top: 10px; color: #666; font-size: 14px;">
+                    • Python + FastAPI (Backend)<br>
+                    • PyTorch + EfficientNet (Machine Learning)<br>
+                    • OpenCV (Computer Vision)<br>
+                    • HTML + CSS + JavaScript (Frontend)<br>
+                </div>
+            </div>
+
+            <label>Version: 1.1.3</label>
+            <label style="margin-top: 10px;">Made as part of Bachelor Thesis for Warsaw University of Technology</label>
+            <label style="margin-top: 10px;">Special thanks to our advisor dr. hab. inż. Jerzy Balicki</label>
+
+
+            <div class="modal-buttons">
+                <button class="modal-button primary" onclick="closeAboutModal()" style="width: 100%;">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = window.location.origin;
 
@@ -400,9 +498,21 @@
                 const response = await fetch(`${API_BASE}/api/tunnel-url`);
                 const data = await response.json();
                 if (data.url) {
-                    document.getElementById('tunnelUrl').textContent = data.url;
+                    const tunnelUrlElement = document.getElementById('tunnelUrl');
+                    const copyButton = document.querySelector('.copy-button');
+                    
+                    tunnelUrlElement.textContent = data.url;
                     document.getElementById('tunnelUrlDisplay').classList.add('active');
-                    document.getElementById('viewDashboardBtn').style.display = 'block';
+                    
+                    if (data.url.startsWith('Error:')) {
+                        tunnelUrlElement.classList.add('error');
+                        copyButton.disabled = true;
+                        document.getElementById('viewDashboardBtn').style.display = 'none';
+                    } else {
+                        tunnelUrlElement.classList.remove('error');
+                        copyButton.disabled = false;
+                        document.getElementById('viewDashboardBtn').style.display = 'block';
+                    }
                 }
             } catch (error) {
                 console.log('Server not yet started');
@@ -426,6 +536,26 @@
 
         function closeClientModal() {
             document.getElementById('clientModal').classList.remove('active');
+        }
+
+        function showTrainModal() {
+            document.getElementById('trainModal').classList.add('active');
+        }
+
+        function closeTrainModal() {
+            document.getElementById('trainModal').classList.remove('active');
+        }
+
+        function showAboutModal() {
+            document.getElementById('aboutModal').classList.add('active');
+        }
+
+        function closeAboutModal() {
+            document.getElementById('aboutModal').classList.remove('active');
+        }
+
+        function openTrainingInterface() {
+            window.location.href = '/train';
         }
 
         async function copyTunnelUrl(event) {
