@@ -514,7 +514,7 @@
 
             // Disable form
             submitBtn.disabled = true;
-            submitBtn.textContent = '🔄 Starting Training...';
+            submitBtn.textContent = 'Starting Training...';
 
             try {
                 // Send training request to server
@@ -653,15 +653,23 @@
         // Stop training button
         document.getElementById('stopTraining').addEventListener('click', async () => {
             if (confirm('Are you sure you want to stop training?')) {
+                // Stop monitoring immediately to prevent further polling
+                stopMonitoring();
+                
                 try {
                     const response = await fetch('/train/stop', { method: 'POST' });
                     const result = await response.json();
                     
                     if (response.ok) {
                         showMessage('Training stopped', 'success');
-                        stopMonitoring();
                         submitBtn.disabled = false;
                         submitBtn.textContent = 'Start Training';
+                        
+                        // Hide stop button when training is stopped
+                        document.getElementById('stopTraining').style.display = 'none';
+                        
+                        // Update status
+                        document.getElementById('trainingStatus').textContent = 'Stopped';
                     } else {
                         showMessage(`Error: ${result.error}`, 'error');
                     }
