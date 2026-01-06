@@ -411,6 +411,8 @@
                         </div>
                     </div>
 
+                    <div id="formMessageContainer"></div>
+
                     <button type="submit" class="submit-btn">Start Training</button>
                 </form>
             </div>
@@ -474,7 +476,7 @@
                 .map(cb => cb.value);
             
             if (datasets.length === 0) {
-                showMessage('Please select at least one dataset', 'error');
+                showFormMessage('Please select at least one dataset', 'error');
                 return;
             }
 
@@ -482,7 +484,7 @@
                 .map(cb => cb.value);
             
             if (metrics.length === 0) {
-                showMessage('Please select at least one metric', 'error');
+                showFormMessage('Please select at least one metric', 'error');
                 return;
             }
 
@@ -493,7 +495,7 @@
             const splitSum = trainSplit + valSplit + testSplit;
             
             if (Math.abs(splitSum - 1.0) > 0.01) {
-                showMessage('Train, Validation, and Test splits must sum to 1.0', 'error');
+                showFormMessage('Train, Validation, and Test splits must sum to 1.0', 'error');
                 return;
             }
 
@@ -704,7 +706,22 @@
             }
         });
 
-        // Show message helper
+        // Show message helper for form validation
+        function showFormMessage(text, type) {
+            const formMessageContainer = document.getElementById('formMessageContainer');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
+            messageDiv.textContent = text;
+            
+            formMessageContainer.innerHTML = '';
+            formMessageContainer.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 5000);
+        }
+
+        // Show message helper for training section
         function showMessage(text, type) {
             const messageDiv = document.createElement('div');
             messageDiv.className = type === 'error' ? 'error-message' : 'success-message';
