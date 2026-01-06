@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emotion Monitoring System - Menu</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+        }
+
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+
+        .mode-card {
+            background: white;
+            border-radius: 12px;
+            padding: 35px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+
+        .mode-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.25);
+        }
+
+        .mode-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+
+        .mode-title {
+            font-size: 24px;
+            color: #333;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .mode-description {
+            color: #666;
+            font-size: 15px;
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        .mode-button {
+            width: 100%;
+            padding: 15px 25px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.2s;
+            font-weight: 600;
+        }
+
+        .mode-button:hover {
+            background: #5568d3;
+        }
+
+        .mode-button:active {
+            transform: scale(0.98);
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-title {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .modal-description {
+            color: #666;
+            font-size: 15px;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            color: #333;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 15px;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin-bottom: 0;
+            cursor: pointer;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        .modal-button {
+            flex: 1;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+
+        .modal-button.primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            background: #5568d3;
+        }
+
+        .modal-button.secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .modal-button.secondary:hover {
+            background: #d0d0d0;
+        }
+
+        .modal-button:active {
+            transform: scale(0.98);
+        }
+
+        .tunnel-url-display {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .tunnel-url-display.active {
+            display: block;
+        }
+
+        .tunnel-url-label {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .tunnel-url-text {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 600;
+            word-break: break-all;
+        }
+
+        .copy-button {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .copy-button:hover {
+            background: #5568d3;
+        }
+
+        .status-message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            display: block;
+        }
+
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            display: block;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 0.8s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Emotion Monitoring System</h1>
+            <p class="subtitle">Choose your role to get started</p>
+        </div>
+
+        <div class="cards-container">
+            <div class="mode-card" onclick="showServerModal()">
+                <div class="mode-icon">👨‍🏫</div>
+                <div class="mode-title">Educator Mode</div>
+                <div class="mode-description">
+                    Start the monitoring server and create a shareable link for your students. 
+                    View real-time emotion analytics on the dashboard.
+                </div>
+                <button class="mode-button">Start as Educator</button>
+            </div>
+
+            <div class="mode-card" onclick="showClientModal()">
+                <div class="mode-icon">🎓</div>
+                <div class="mode-title">Student Mode</div>
+                <div class="mode-description">
+                    Connect your camera to your educator's server. 
+                    Your emotion data will be sent securely for analysis.
+                </div>
+                <button class="mode-button">Start as Student</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="serverModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🎓 Start Educator Server</div>
+            <div class="modal-description">
+                The server will create a secure tunnel and provide you with a shareable URL. 
+                Students can use this URL to connect their cameras.
+            </div>
+
+            <div class="tunnel-url-display" id="tunnelUrlDisplay">
+                <div class="tunnel-url-label">Share this URL with your students:</div>
+                <div class="tunnel-url-text" id="tunnelUrl">Loading...</div>
+                <button class="copy-button" onclick="copyTunnelUrl(event)">📋 Copy URL</button>
+            </div>
+
+            <div class="status-message" id="serverStatus"></div>
+
+            <div class="modal-buttons">
+                <button class="modal-button secondary" onclick="closeServerModal()">Close</button>
+                <button class="modal-button primary" id="viewDashboardBtn" onclick="viewDashboard()" style="display: none;">
+                    View Dashboard
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="clientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">🎓 Connect as Student</div>
+            <div class="modal-description">
+                Enter the URL provided by your educator to connect your camera.
+            </div>
+
+            <div class="form-group">
+                <label for="serverUrl">Server URL</label>
+                <input type="text" id="serverUrl" placeholder="http://example.com" />
+            </div>
+
+            <div class="form-group">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="showCamera" />
+                    <label for="showCamera">Show camera preview</label>
+                </div>
+            </div>
+
+            <div class="status-message" id="clientStatus"></div>
+
+            <div class="modal-buttons">
+                <button class="modal-button secondary" onclick="closeClientModal()">Cancel</button>
+                <button class="modal-button primary" onclick="startClient()" id="startClientBtn">
+                    Connect Camera
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/tunnel-url`);
+                const data = await response.json();
+                if (data.url) {
+                    document.getElementById('tunnelUrl').textContent = data.url;
+                    document.getElementById('tunnelUrlDisplay').classList.add('active');
+                    document.getElementById('viewDashboardBtn').style.display = 'block';
+                }
+            } catch (error) {
+                console.log('Server not yet started');
+            }
+        }
+
+        checkServerStatus();
+
+        function showServerModal() {
+            document.getElementById('serverModal').classList.add('active');
+            checkServerStatus();
+        }
+
+        function closeServerModal() {
+            document.getElementById('serverModal').classList.remove('active');
+        }
+
+        function showClientModal() {
+            document.getElementById('clientModal').classList.add('active');
+        }
+
+        function closeClientModal() {
+            document.getElementById('clientModal').classList.remove('active');
+        }
+
+        async function copyTunnelUrl(event) {
+            const url = document.getElementById('tunnelUrl').textContent;
+            try {
+                await navigator.clipboard.writeText(url);
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                }, 2000);
+            } catch (error) {
+                console.error("Copy failed:", error)
+                alert('Failed to copy URL. Please copy manually: ' + url);
+            }
+        }
+
+        function viewDashboard() {
+            window.location.href = document.getElementById('tunnelUrl').textContent + '/dashboard';
+        }
+
+        async function startClient() {
+            const url = document.getElementById('serverUrl').value.trim();
+            const showCamera = document.getElementById('showCamera').checked;
+            const statusDiv = document.getElementById('clientStatus');
+            const startBtn = document.getElementById('startClientBtn');
+
+            if (!url) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = 'Please enter a server URL';
+                return;
+            }
+
+            startBtn.disabled = true;
+            startBtn.innerHTML = 'Connecting... <span class="loading-spinner"></span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/start-client`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ url, show_camera: showCamera })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.className = 'status-message success';
+                    statusDiv.textContent = '✓ Camera started! To stop the connection press Cancel.';
+                    startBtn.textContent = 'Connected';
+                } else {
+                    statusDiv.className = 'status-message error';
+                    statusDiv.textContent = 'Error: ' + (data.error || 'Failed to start client');
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Connect Camera';
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = 'Connection error: ' + error.message;
+                startBtn.disabled = false;
+                startBtn.textContent = 'Connect Camera';
+            }
+        }
+
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.classList.remove('active');
+            }
+        }
+
+        setInterval(() => {
+            if (document.getElementById('serverModal').classList.contains('active')) {
+                checkServerStatus();
+            }
+        }, 2000);
+    </script>
+</body>
+</html>
