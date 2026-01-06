@@ -315,12 +315,29 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+
+        .authors-corner {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            font-size: 16px;
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .authors-corner div {
+            margin: 2px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Emotion Monitoring System</h1>
+            <h1>Application for Emotion Recognition in Educational Context</h1>
             <p class="subtitle">Choose an option to get started</p>
         </div>
 
@@ -488,6 +505,15 @@
                 </button>
             </div>
         </div>
+    </div>
+    <div class="authors-corner">
+                <label>Authors:</label>
+                <div style="margin-top: 10px; color: #666;">
+                    • Maksym Nosal<br>
+                    • Maciej Sosnowski<br>
+                    • Oleksandr Shkil<br>
+                </div>
+        <!-- <div style="margin-top: 5px; font-weight: 600;">Warsaw University of Technology</div> -->
     </div>
 
     <script>
