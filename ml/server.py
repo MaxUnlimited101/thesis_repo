@@ -145,8 +145,12 @@ def calculate_metrics(y_true, y_pred, y_prob, metric_names):
     """Calculate specified metrics"""
     metrics = {}
     
-    # always calculate accuracy
-    metrics["accuracy"] = accuracy_score(y_true, y_pred)
+    # Always calculate accuracy for internal tracking of best model
+    accuracy = accuracy_score(y_true, y_pred)
+    
+    # Only add accuracy to metrics dict (for plotting) if user selected it
+    if "accuracy" in metric_names:
+        metrics["accuracy"] = accuracy
     
     if "precision" in metric_names:
         metrics["precision"] = precision_score(y_true, y_pred, average='weighted', zero_division=0)
@@ -160,7 +164,8 @@ def calculate_metrics(y_true, y_pred, y_prob, metric_names):
         except:
             metrics["roc_auc"] = 0.0
     
-    return metrics
+    # Return both metrics dict and accuracy separately
+    return metrics, accuracy
 
 
 def generate_plot():
@@ -382,7 +387,7 @@ def train_model(config):
             training_manager.train_losses.append(train_loss)
             
             # Calculate training metrics
-            train_metrics = calculate_metrics(
+            train_metrics, train_accuracy = calculate_metrics(
                 np.array(train_labels),
                 np.array(train_preds),
                 np.array(train_probs),
@@ -417,7 +422,7 @@ def train_model(config):
             training_manager.val_losses.append(val_loss)
             
             # Calculate validation metrics
-            val_metrics = calculate_metrics(
+            val_metrics, val_accuracy = calculate_metrics(
                 np.array(val_labels),
                 np.array(val_preds),
                 np.array(val_probs),
@@ -427,13 +432,12 @@ def train_model(config):
             for metric_name, value in val_metrics.items():
                 training_manager.val_metrics[metric_name].append(value)
             
-            # Update best accuracy
-            if "accuracy" in val_metrics:
-                if val_metrics["accuracy"] > training_manager.best_accuracy:
-                    training_manager.best_accuracy = val_metrics["accuracy"]
-                    # Save best model
-                    torch.save(model, training_manager.model_path)
-                    print(f"Saved best model with accuracy: {training_manager.best_accuracy:.4f}")
+            # Always update best accuracy (even if not selected for plotting)
+            if val_accuracy > training_manager.best_accuracy:
+                training_manager.best_accuracy = val_accuracy
+                # Save best model
+                torch.save(model, training_manager.model_path)
+                print(f"Saved best model with accuracy: {training_manager.best_accuracy:.4f}")
             
             # Update scheduler
             if scheduler:
@@ -446,8 +450,7 @@ def train_model(config):
             generate_plot()
             
             print(f"Epoch {epoch+1}/{num_epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}")
-            if "accuracy" in val_metrics:
-                print(f"Val Accuracy: {val_metrics['accuracy']:.4f}")
+            print(f"Val Accuracy: {val_accuracy:.4f}")
         
         # Save final model if not already saved
         if not os.path.exists(training_manager.model_path):
