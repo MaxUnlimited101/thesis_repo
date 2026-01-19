@@ -257,7 +257,32 @@
         .back-button:active {
             transform: translateY(0);
         }
+
+        input[list] {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            min-width: 200px;
+        }
+
+        input[list]:hover {
+            border-color: #667eea;
+        }
+
+        input[list]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[list]::placeholder {
+            color: #999;
+        }        
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -288,6 +313,12 @@
                     <select id="studentSelect">
                         <option value="">All Students</option>
                     </select>
+                    <select id="chartTypeSelect">
+                        <option value="area">Area</option>
+                        <option value="pie">Pie</option>
+                        <option value="line">Line</option>
+                        <option value="polarArea">Polar</option>
+                    </select>
                     <select id="graphTypeSelect">
                         <option value="regular">Regular</option>
                         <option value="cumulative">Cumulative</option>
@@ -297,8 +328,9 @@
                 </div>
             </div>
             
-            <img id="emotionPlot" class="plot-image" alt="Emotion Distribution Chart">
-            <div class="loading" id="loadingIndicator">Loading data...</div>
+            <div class="plot-image">
+                <canvas id="emotionChart"></canvas>
+            </div>
             <div class="error" id="errorMessage"></div>
             
             <div class="last-update">
@@ -321,71 +353,187 @@
     <script>
         const API_BASE = window.location.origin;
         let autoRefreshInterval;
-        const REFRESH_INTERVAL = 10000; // 10 seconds
+        const REFRESH_INTERVAL = 10000;
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             refreshPlot();
             fetchStatistics();
             startAutoRefresh();
             
-            // Student select change handler
             document.getElementById('studentSelect').addEventListener('change', (e) => {
                 refreshPlot();
             });
 
-            // Graph type select change handler
+            document.getElementById('chartTypeSelect').addEventListener('change', (e) => {
+                refreshPlot();
+            });
+
             document.getElementById('graphTypeSelect').addEventListener('change', (e) => {
                 refreshPlot();
             });
         });
 
+        let emotionChartInstance = null;
+        let currentChartType = null;
+        let summaryChartTypes = ["pie", "polarArea"];
+        let chartConfigs = {
+            area: {
+                type: 'line',
+                options: {
+                    scales: {
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            max: 1.0,
+                            title: {
+                                display: true,
+                                text: 'Probability'
+                            }
+                        },
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Emotion Data Readings',
+                                font: {
+                                    size: 16,
+                                    weight: 'bold'
+                                },
+                                padding: {top: 10, bottom: 0}
+                            }
+                        }
+                    },
+                    plugins: {
+                        filler: {
+                            propagate: true
+                        }
+                    }
+                },
+                // datasetOptions: {
+                //     fill: true,
+                //     tension: 0.4
+                // }
+            },
+            line: {
+                type: 'line',
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1.0,
+                            title: {
+                                display: true,
+                                text: 'Probability'
+                            }                            
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Emotion Data Readings',
+                                font: {
+                                    size: 16,
+                                    weight: 'bold'
+                                },
+                                padding: {top: 10, bottom: 0}
+                            }
+                        }                        
+                    }
+                },
+                datasetOptions: {
+                    fill: false,
+                    tension: 0.4
+                }
+            },
+            pie: {
+                type: 'pie',
+                options: {
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                },
+                datasetOptions: {}
+            },
+            polar: {
+                type: 'polar',
+                options: {
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }
+                },
+                datasetOptions: {}
+            }
+        };
+
+        let currentFetchController = null;
+
         async function refreshPlot() {
+
+            if (currentFetchController) {
+                currentFetchController.abort();
+            }
+    
+            currentFetchController = new AbortController();
+
             const plotImg = document.getElementById('emotionPlot');
-            const loading = document.getElementById('loadingIndicator');
             const errorDiv = document.getElementById('errorMessage');
             const studentId = document.getElementById('studentSelect').value;
             const graphType = document.getElementById('graphTypeSelect').value;
             const smallLoader = document.getElementById('smallLoader');
+
+            const chartType = document.getElementById('chartTypeSelect').value;
             
-            //loading.style.display = 'block';
-            //plotImg.style.display = 'none';
-            //errorDiv.style.display = 'none';
-            
-                try {
-                    const url = (studentId 
-                        ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
-                        : `${API_BASE}/api/plot?t=${Date.now()}`)
-                        + `&type=${graphType}`;
+            // errorDiv.style.display = 'none';
 
-                    // Show small loader while new image is loading, keep old image visible
-                    smallLoader.style.display = 'inline-block';
+            const url = (studentId 
+                ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
+                : `${API_BASE}/api/plot?t=${Date.now()}`)
+                + `&is-cumulative=${graphType == 'cumulative'}`
+                + `&is-summary=${summaryChartTypes.includes(chartType)}`
+                + `&fill=${chartType!='line'}`;
 
-                    // Load new image in background
-                    const loader = new Image();
-                    loader.onload = () => {
-                        // Swap in the newly loaded image
-                        plotImg.src = url;
-                        plotImg.style.display = 'block';
-                        loading.style.display = 'none';
-                        smallLoader.style.display = 'none';
-                        errorDiv.style.display = 'none';
-                        updateLastUpdateTime();
-                    };
-                    loader.onerror = () => {
-                        smallLoader.style.display = 'none';
-                        loading.style.display = 'none';
-                        errorDiv.textContent = `Error loading plot`;
-                        errorDiv.style.display = 'block';
-                    };
+            try {
+                const response = await fetch(url, { signal: currentFetchController.signal });
+                const data =  await response.json();
 
-                    // Trigger load (browser will fetch the image)
-                    loader.src = url;
-                } catch (error) {
-                    loading.style.display = 'none';
+                if (emotionChartInstance && currentChartType !== chartType) {
+                    emotionChartInstance.destroy();
+                    emotionChartInstance = null;
+                }
+
+                if (!emotionChartInstance) {
+                    const ctx = document.getElementById('emotionChart').getContext('2d');
+                    currentChartType = chartType;
+                    const config = chartConfigs[currentChartType] || chartConfigs.line;
+                    emotionChartInstance = new Chart(ctx, {
+                        type: config.type, 
+                        data: data,
+                        options: config.options
+                    });
+                } else {
+                    emotionChartInstance.data.labels = data.labels;
+                    emotionChartInstance.data.datasets = data.datasets; 
+                    emotionChartInstance.update('none');
+                }
+                updateLastUpdateTime();
+
+            }   catch (error) {
+                    if (error.name == 'AbortError') {
+                        return
+                    }
+                    // loading.style.display = 'none';
                     errorDiv.textContent = `Error loading plot: ${error.message}`;
                     errorDiv.style.display = 'block';
-                }
+            }
         }
 
         async function fetchStatistics() {

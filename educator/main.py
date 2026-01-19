@@ -15,12 +15,13 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import io
 from fastapi.staticfiles import StaticFiles
 import webbrowser
 import threading
-
+import json
 
 # ============================================================================
 # SHARED CONFIGURATION
@@ -34,6 +35,7 @@ CLIENT_MODE = False
 CLIENT_CONFIG = {}
 CLIENT_THREAD = None
 CLIENT_THREAD_RUNNING = False
+
 
 FACE_EXTENSION_Y=50
 FACE_EXTENSION_X=15
@@ -52,6 +54,28 @@ colors = {
     'neutral': "#808991", 'happy': "#FFF700", 'sad': "#0B4CB3",
     'surprise': "#51B3F0", 'fear': "#1F6D2E", 'disgust': "#79299C",
     'angry': "#CF0E0E", 'contempt': "#C3A02F"
+}
+
+colors_rgba = {
+    'neutral': 'rgba(128, 137, 145, 1)',
+    'happy': 'rgba(255, 247, 0, 1)',
+    'sad': 'rgba(11, 76, 179, 1)',
+    'surprise': 'rgba(81, 179, 240, 1)',
+    'fear': 'rgba(31, 109, 46, 1)',
+    'disgust': 'rgba(121, 41, 156, 1)',
+    'angry': 'rgba(207, 14, 14, 1)',
+    'contempt': 'rgba(195, 160, 47, 1)'
+}
+
+border_colors_rgba = {
+    'neutral': 'rgba(90, 97, 105, 1)',
+    'happy': 'rgba(230, 180, 0, 1)',
+    'sad': 'rgba(8, 50, 140, 1)',
+    'surprise': 'rgba(45, 140, 200, 1)',
+    'fear': 'rgba(20, 80, 30, 1)',
+    'disgust': 'rgba(90, 25, 120, 1)',
+    'angry': 'rgba(160, 10, 10, 1)',
+    'contempt': 'rgba(150, 120, 30, 1)'
 }
 
 def init_server():
@@ -96,12 +120,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+def get_summarized_emotions(emotion_arrays):
+    summed_per_emotion = [np.sum(arr) for arr in emotion_arrays]
+    
+    grand_total = sum(summed_per_emotion)
+    
+    if grand_total == 0:
+        normalized_values = [0.0] * len(summed_per_emotion)
+    else:
+        normalized_values = [val / grand_total for val in summed_per_emotion]
+    
+    return normalized_values
 
-async def generate_plot(student_id: str = None, cumulative: bool = False):
-    """Generate stacked area chart showing emotion distribution"""
+async def generate_plot(student_id: str = None, is_cumulative: bool = False, is_summary: bool = False, fill: bool = True):
+    """Generate chart showing emotion distribution"""
     async with predictions_lock:
         if not predictions_log:
-            return None
+            return json.dumps({"labels": [], "datasets": []})
         
         if student_id:
             filtered_data = [(sid, ts, preds) for sid, ts, preds in predictions_log if sid == student_id]
@@ -109,7 +144,7 @@ async def generate_plot(student_id: str = None, cumulative: bool = False):
             filtered_data = predictions_log
         
         if not filtered_data:
-            return None
+            return json.dumps({"labels": [], "datasets": []})
         
         filtered_data.sort(key=lambda x: x[1])
         timestamps = [entry[1] for entry in filtered_data]
@@ -119,36 +154,47 @@ async def generate_plot(student_id: str = None, cumulative: bool = False):
         for _, _, predictions in filtered_data:
             for key in emotion_keys:
                 emotion_data[key].append(predictions.get(key, 0.0))
-        
+
         emotion_arrays = [np.array(emotion_data[key]) for key in emotion_keys]
-        if cumulative:
-            emotion_arrays = [np.cumsum(arr) for arr in emotion_arrays]
-        
-        fig, ax = plt.subplots(figsize=(12, 6))
-        time_indices = list(range(1, len(timestamps) + 1))
-        
-        color_list = [colors.get(key.lower(), '#CCCCCC') for key in emotion_keys]
-        
-        ax.stackplot(time_indices, *emotion_arrays, labels=emotion_keys, colors=color_list, alpha=0.8)
-        ax.set_xlabel('Reading index', fontsize=12)
-        ylabel = 'Cumulative Emotion Count' if cumulative else 'Emotion Probability'
-        ax.set_ylabel(ylabel, fontsize=12)
-        
-        title_suffix = f" - {student_id}" if student_id else " - All Students"
-        title_prefix = "Cumulative " if cumulative else ""
-        ax.set_title(f'{title_prefix}Emotion Distribution Over Readings{title_suffix}', fontsize=14, pad=20)
-        
-        if not cumulative:
-            ax.set_ylim(0, 1)
-        ax.grid(True, alpha=0.3, linestyle='--')
-        ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), framealpha=0.9, fontsize=10)
-        plt.tight_layout()
-        
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-        buf.seek(0)
-        plt.close(fig)
-        return buf
+
+        datasets = []
+        if is_summary:
+            summarized_values = get_summarized_emotions(emotion_arrays)
+            
+            labels = emotion_keys
+
+            datasets = [{
+                "label": emotion_keys,
+                "data": summarized_values,
+                "backgroundColor": [colors_rgba.get(k, "#808080") for k in emotion_keys],
+                "borderWidth": 2,
+            }]
+            
+
+        else:
+            labels = [f"{i}" for i in range(len(emotion_arrays[0]))]        
+
+            if is_cumulative:
+                emotion_arrays = [np.cumsum(arr) for arr in emotion_arrays]
+                total_final = sum(arr[-1] for arr in emotion_arrays)
+                emotion_arrays = [arr / total_final for arr in emotion_arrays]
+                
+            for key, data_array in zip(emotion_keys, emotion_arrays):
+                datasets.append({
+                    "label": key,
+                    "data": data_array.tolist(),
+                    "backgroundColor": colors_rgba.get(key, "#808080"),
+                    "fill": fill,
+                    "borderWidth": 3,
+                    "borderColor": border_colors_rgba.get(key, "#808080")
+                })
+
+        chart_data = {
+            "labels": labels,
+            "datasets": datasets
+        }
+
+        return json.dumps(chart_data)
 
 
 @app.post("/api/emotions")
@@ -191,18 +237,18 @@ async def get_statistics():
 
 
 @app.get("/api/plot/{student_id}")
-async def get_student_plot(student_id: str, type: str = "regular"):
+async def get_student_plot(student_id: str, is_cumulative: bool = False, is_summary: bool = False, fill : bool = True):
     """Get emotion plot for specific student"""
-    plot_buffer = await generate_plot(student_id, cumulative=(type == "cumulative"))
+    plot_buffer = await generate_plot(student_id, is_cumulative, is_summary, fill)
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
     return StreamingResponse(plot_buffer, media_type="image/png")
 
 
 @app.get("/api/plot")
-async def get_all_students_plot(type: str = "regular"):
+async def get_all_students_plot(is_cumulative: bool = False, is_summary: bool = False, fill : bool = True):
     """Get emotion plot for all students"""
-    plot_buffer = await generate_plot(cumulative=(type == "cumulative"))
+    plot_buffer = await generate_plot(is_cumulative, is_summary, fill)
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
     return StreamingResponse(plot_buffer, media_type="image/png")
