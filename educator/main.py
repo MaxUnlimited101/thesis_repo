@@ -132,7 +132,7 @@ def get_summarized_emotions(emotion_arrays):
     
     return normalized_values
 
-async def generate_plot(student_id: str = None, is_cumulative: bool = False, is_summary: bool = False, fill: bool = True):
+async def generate_plot(is_cumulative: bool = False, is_summary: bool = False, fill: bool = True, student_id: str = None):
     """Generate chart showing emotion distribution"""
     async with predictions_lock:
         if not predictions_log:
@@ -169,8 +169,6 @@ async def generate_plot(student_id: str = None, is_cumulative: bool = False, is_
                 "backgroundColor": [colors_rgba.get(k, "#808080") for k in emotion_keys],
                 "borderWidth": 2,
             }]
-            
-
         else:
             labels = [f"{i}" for i in range(len(emotion_arrays[0]))]        
 
@@ -239,7 +237,7 @@ async def get_statistics():
 @app.get("/api/plot/{student_id}")
 async def get_student_plot(student_id: str, is_cumulative: bool = False, is_summary: bool = False, fill : bool = True):
     """Get emotion plot for specific student"""
-    plot_buffer = await generate_plot(student_id, is_cumulative, is_summary, fill)
+    plot_buffer = await generate_plot(is_cumulative, is_summary, fill, student_id)
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
     return StreamingResponse(plot_buffer, media_type="image/png")
@@ -495,7 +493,7 @@ def run_client(endpoint_url, show_camera=False):
                     cv2.rectangle(frame, (x - FACE_EXTENSION_X, y - FACE_EXTENSION_Y), (x + w + FACE_EXTENSION_X, y + h + FACE_EXTENSION_Y), (0, 255, 0), 2)
                 frame = cv2.flip(frame, 1)
                 status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
-                display_frame = cv2.resize(frame, (640, 480))
+                display_frame = cv2.resize(frame, (640, 480))   
                 cv2.putText(display_frame, status_text, (10, 30),
                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 cv2.imshow("Real-Time Camera View (Press 'q' to stop)", display_frame)
