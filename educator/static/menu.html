@@ -229,6 +229,11 @@
             transform: scale(0.98);
         }
 
+        .modal-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .tunnel-url-display {
             background: #f5f5f5;
             padding: 15px;
@@ -431,9 +436,12 @@
             <div class="status-message" id="clientStatus"></div>
 
             <div class="modal-buttons">
-                <button class="modal-button secondary" onclick="closeClientModal()">Cancel</button>
+                <button class="modal-button secondary" onclick="handleClientCancel()" id="cancelClientBtn">Cancel</button>
                 <button class="modal-button primary" onclick="startClient()" id="startClientBtn">
                     Connect Camera
+                </button>
+                <button class="modal-button secondary" onclick="stopClient()" id="stopClientBtn" style="display: none; background: #dc3545;">
+                    Stop Client
                 </button>
             </div>
         </div>
@@ -551,17 +559,38 @@
             document.getElementById('serverModal').classList.add('active');
             checkServerStatus();
         }
-
+        
         function closeServerModal() {
             document.getElementById('serverModal').classList.remove('active');
         }
 
         function showClientModal() {
             document.getElementById('clientModal').classList.add('active');
+            document.getElementById('serverUrl').select();
         }
 
         function closeClientModal() {
             document.getElementById('clientModal').classList.remove('active');
+        }
+
+        async function handleClientCancel() {
+            const isRunning = await checkClientStatus();
+            if (isRunning) {
+                if (confirm('Client is currently running. Do you want to stop it?')) {
+                    await stopClient();
+                }
+            }
+            closeClientModal();
+        }
+
+        async function checkClientStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/client-status`);
+                const data = await response.json();
+                return data.running;
+            } catch (error) {
+                return false;
+            }
         }
 
         function showTrainModal() {
@@ -609,6 +638,8 @@
             const showCamera = document.getElementById('showCamera').checked;
             const statusDiv = document.getElementById('clientStatus');
             const startBtn = document.getElementById('startClientBtn');
+            const stopBtn = document.getElementById('stopClientBtn');
+            const cancelBtn = document.getElementById('cancelClientBtn');
 
             if (!url) {
                 statusDiv.className = 'status-message error';
@@ -632,8 +663,10 @@
 
                 if (response.ok) {
                     statusDiv.className = 'status-message success';
-                    statusDiv.textContent = '✓ Camera started! To stop the connection press Cancel.';
-                    startBtn.textContent = 'Connected';
+                    statusDiv.textContent = '✓ Camera started!';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'block';
+                    cancelBtn.textContent = 'Close';
                 } else {
                     statusDiv.className = 'status-message error';
                     statusDiv.textContent = 'Error: ' + (data.error || 'Failed to start client');
@@ -645,6 +678,44 @@
                 statusDiv.textContent = 'Connection error: ' + error.message;
                 startBtn.disabled = false;
                 startBtn.textContent = 'Connect Camera';
+            }
+        }
+
+        async function stopClient() {
+            const statusDiv = document.getElementById('clientStatus');
+            const startBtn = document.getElementById('startClientBtn');
+            const stopBtn = document.getElementById('stopClientBtn');
+            const cancelBtn = document.getElementById('cancelClientBtn');
+
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = 'Stopping... <span class="loading-spinner"></span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/stop-client`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.className = 'status-message success';
+                    statusDiv.textContent = '✓ Client stopped successfully';
+                    stopBtn.style.display = 'none';
+                    startBtn.style.display = 'block';
+                    startBtn.disabled = false;
+                    startBtn.textContent = 'Connect Camera';
+                    cancelBtn.textContent = 'Cancel';
+                } else {
+                    statusDiv.className = 'status-message error';
+                    statusDiv.textContent = 'Error: ' + (data.error || 'Failed to stop client');
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Stop Client';
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = 'Stop error: ' + error.message;
+                stopBtn.disabled = false;
+                stopBtn.textContent = 'Stop Client';
             }
         }
 

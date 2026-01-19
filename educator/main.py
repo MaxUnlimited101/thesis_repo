@@ -32,6 +32,8 @@ CAPTURE_INTERVAL = 5  # seconds
 TUNNEL_URL = None
 CLIENT_MODE = False
 CLIENT_CONFIG = {}
+CLIENT_THREAD = None
+CLIENT_THREAD_RUNNING = False
 
 FACE_EXTENSION_Y=50
 FACE_EXTENSION_X=15
@@ -41,7 +43,9 @@ FACE_EXTENSION_X=15
 # SERVER (EDUCATOR) CODE
 # ============================================================================
 TOKEN = ""
+USER_TIMEOUT = 10
 predictions_log = []
+active_students = dict()
 predictions_lock = Lock()
 
 colors = {
@@ -152,10 +156,12 @@ async def receive_emotions(request: Request):
     """Receive emotion predictions from clients"""
     try:
         data = await request.json()
+        student_id = data['id']
         timestamp = int(time.time())
         async with predictions_lock:
-            predictions_log.append((data['id'], timestamp, data['predictions']))
-        print(f"Received data from {data['id']} at {timestamp}")
+            predictions_log.append((student_id, timestamp, data['predictions']))
+            active_students[student_id] = timestamp
+        print(f"Received data from {student_id} at {timestamp}")
         return JSONResponse({"status": "ok"}, status_code=200)
     except Exception as e:
         print("Error:", e)
@@ -166,13 +172,20 @@ async def receive_emotions(request: Request):
 async def get_statistics():
     """Get overall statistics for dashboard"""
     async with predictions_lock:
+        now = time.time()
+
+        active_ids = [
+            sid for sid, last_seen in active_students.items()
+            if (now - last_seen) < USER_TIMEOUT
+        ]
+
         student_counts = defaultdict(int)
         for student_id, _, _ in predictions_log:
             student_counts[student_id] += 1
         return {
             "total_students": len(student_counts),
             "total_predictions": len(predictions_log),
-            "active_sessions": len(student_counts),
+            "active_sessions": len(active_ids),
             "students": dict(student_counts)
         }
 
@@ -210,6 +223,8 @@ async def start_server_mode():
 @app.post("/api/start-client")
 async def start_client_mode(request: Request):
     """Start client mode"""
+    global CLIENT_THREAD, CLIENT_THREAD_RUNNING
+    
     data = await request.json()
     endpoint_url = data.get('url', '')
     show_camera = data.get('show_camera', False)
@@ -217,14 +232,37 @@ async def start_client_mode(request: Request):
     if not endpoint_url:
         return JSONResponse({"error": "URL is required"}, status_code=400)
     
+    if CLIENT_THREAD and CLIENT_THREAD.is_alive():
+        return JSONResponse({"error": "Client already running"}, status_code=400)
+    
     # Start client in a separate thread
     def run_client_thread():
+        global CLIENT_THREAD_RUNNING
+        CLIENT_THREAD_RUNNING = True
         run_client(endpoint_url, show_camera)
     
-    thread = threading.Thread(target=run_client_thread, daemon=True)
-    thread.start()
+    CLIENT_THREAD = threading.Thread(target=run_client_thread, daemon=True)
+    CLIENT_THREAD.start()
     
     return {"status": "Client started", "url": endpoint_url}
+
+
+@app.post("/api/stop-client")
+async def stop_client_mode():
+    """Stop client mode"""
+    global CLIENT_THREAD_RUNNING
+    
+    if not CLIENT_THREAD or not CLIENT_THREAD.is_alive():
+        return JSONResponse({"error": "Client not running"}, status_code=400)
+    
+    CLIENT_THREAD_RUNNING = False
+    return {"status": "Client stopped"}
+
+
+@app.get("/api/client-status")
+async def get_client_status():
+    """Get client running status"""
+    return {"running": CLIENT_THREAD and CLIENT_THREAD.is_alive()}
 
 
 @app.get("/health")
@@ -336,6 +374,7 @@ def send_to_server(data, endpoint_url):
 
 def run_client(endpoint_url, show_camera=False):
     """Run emotion detection client"""
+    
     print("\n" + "="*60)
     print("  STARTING CLIENT MODE")
     print("="*60)
@@ -382,13 +421,13 @@ def run_client(endpoint_url, show_camera=False):
         print("Camera view enabled. Press 'q' in the camera window to close it.")
     
     print(f"\nCamera running. Sending predictions every {CAPTURE_INTERVAL}s to {endpoint_url}")
-    print("Press Ctrl+C to stop\n")
+    print("Click 'Stop Client' to stop\n")
     
     last_capture_time = time.time()
     GUID = uuid.uuid4()
     
     try:
-        while True:
+        while CLIENT_THREAD_RUNNING:
             ret, frame = cap.read()
             if not ret:
                 print("Warning: Could not read frame")
