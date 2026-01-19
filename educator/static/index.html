@@ -387,7 +387,10 @@
                             max: 1.0,
                             title: {
                                 display: true,
-                                text: 'Probability'
+                                text: 'Probability',
+                                font: {
+                                    size: 16
+                                }
                             }
                         },
                         x: {
@@ -396,7 +399,7 @@
                                 display: true,
                                 text: 'Emotion Data Readings',
                                 font: {
-                                    size: 16,
+                                    size: 20,
                                     weight: 'bold'
                                 },
                                 padding: {top: 10, bottom: 0}
@@ -454,19 +457,19 @@
                         y: {
                             display: false
                         }
-                    }
+                    }                    
                 },
                 datasetOptions: {}
             },
-            polar: {
-                type: 'polar',
+            polarArea: {
+                type: 'polarArea',
                 options: {
                     scales: {
-                        x: {
-                            display: false
-                        },
-                        y: {
-                            display: false
+                        r: {
+                            beginAtZero: true,
+                            ticks: {
+                                display: false
+                            }
                         }
                     }
                 },
@@ -497,8 +500,8 @@
             const url = (studentId 
                 ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
                 : `${API_BASE}/api/plot?t=${Date.now()}`)
-                + `&is-cumulative=${graphType == 'cumulative'}`
-                + `&is-summary=${summaryChartTypes.includes(chartType)}`
+                + `&is_cumulative=${graphType == 'cumulative'}`
+                + `&is_summary=${summaryChartTypes.includes(chartType)}`
                 + `&fill=${chartType!='line'}`;
 
             try {
@@ -533,6 +536,8 @@
                     // loading.style.display = 'none';
                     errorDiv.textContent = `Error loading plot: ${error.message}`;
                     errorDiv.style.display = 'block';
+                    emotionChartInstance.destroy();
+                    emotionChartInstance = null;
             }
         }
 
