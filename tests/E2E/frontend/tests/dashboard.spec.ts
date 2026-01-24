@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Emotion Dashboard - Basic UI', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/dashboard');
   });
 
   test('page loads successfully', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Emotion Dashboard - Basic UI', () => {
 
 test.describe('Emotion Dashboard - Statistics', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/dashboard');
   });
 
   test('statistics update after data submission', async ({ page, request }) => {
@@ -123,7 +123,7 @@ test.describe('Emotion Dashboard - Plot Functionality', () => {
       });
     }
     
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.waitForTimeout(1000);
   });
 
@@ -200,7 +200,7 @@ test.describe('Emotion Dashboard - Student Filtering', () => {
       });
     }
     
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.waitForTimeout(1000);
   });
 
@@ -278,7 +278,7 @@ test.describe('Emotion Dashboard - Students List', () => {
       });
     }
     
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.waitForTimeout(1000);
   });
 
@@ -322,7 +322,7 @@ test.describe('Emotion Dashboard - Students List', () => {
 
 test.describe('Emotion Dashboard - Auto Refresh', () => {
   test('auto refresh updates data periodically', async ({ page, request }) => {
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.waitForTimeout(2000);
     
     const initialPredictions = await page.locator('#totalPredictions').textContent();
@@ -351,7 +351,7 @@ test.describe('Emotion Dashboard - Auto Refresh', () => {
 test.describe('Emotion Dashboard - Responsive Design', () => {
   test('displays correctly on mobile viewport', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
+    await page.goto('/dashboard');
     
     await expect(page.locator('h1')).toBeVisible();
     await expect(page.locator('.stats-grid')).toBeVisible();
@@ -360,7 +360,7 @@ test.describe('Emotion Dashboard - Responsive Design', () => {
 
   test('displays correctly on tablet viewport', async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    await page.goto('/');
+    await page.goto('/dashboard');
     
     await expect(page.locator('h1')).toBeVisible();
     await expect(page.locator('.stats-grid')).toBeVisible();
@@ -369,7 +369,7 @@ test.describe('Emotion Dashboard - Responsive Design', () => {
 
   test('displays correctly on desktop viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.goto('/');
+    await page.goto('/dashboard');
     
     await expect(page.locator('h1')).toBeVisible();
     await expect(page.locator('.stats-grid')).toBeVisible();
@@ -380,7 +380,7 @@ test.describe('Emotion Dashboard - Responsive Design', () => {
 test.describe('Emotion Dashboard - Performance', () => {
   test('page loads within acceptable time', async ({ page }) => {
     const startTime = Date.now();
-    await page.goto('/');
+    await page.goto('/dashboard');
     await page.waitForLoadState('networkidle');
     const loadTime = Date.now() - startTime;
     
@@ -397,7 +397,7 @@ test.describe('Emotion Dashboard - Performance', () => {
       }
     });
     
-    await page.goto('/');
+    await page.goto('/dashboard');
     
     const startTime = Date.now();
     await page.locator('#emotionPlot').waitFor({ state: 'visible', timeout: 10000 });
