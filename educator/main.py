@@ -15,12 +15,13 @@ from collections import defaultdict
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import numpy as np
 import io
 from fastapi.staticfiles import StaticFiles
 import webbrowser
 import threading
-
+import json
 
 # ============================================================================
 # SHARED CONFIGURATION
@@ -32,6 +33,9 @@ CAPTURE_INTERVAL = 5  # seconds
 TUNNEL_URL = None
 CLIENT_MODE = False
 CLIENT_CONFIG = {}
+CLIENT_THREAD = None
+CLIENT_THREAD_RUNNING = False
+
 
 FACE_EXTENSION_Y=50
 FACE_EXTENSION_X=15
@@ -41,13 +45,38 @@ FACE_EXTENSION_X=15
 # SERVER (EDUCATOR) CODE
 # ============================================================================
 TOKEN = ""
+USER_TIMEOUT = 10
 predictions_log = []
+active_students = dict()
 predictions_lock = Lock()
+session_id = str(uuid.uuid4())  # Track current session
 
 colors = {
     'neutral': "#808991", 'happy': "#FFF700", 'sad': "#0B4CB3",
     'surprise': "#51B3F0", 'fear': "#1F6D2E", 'disgust': "#79299C",
     'angry': "#CF0E0E", 'contempt': "#C3A02F"
+}
+
+colors_rgba = {
+    'neutral': 'rgba(128, 137, 145, 1)',
+    'happy': 'rgba(255, 247, 0, 1)',
+    'sad': 'rgba(11, 76, 179, 1)',
+    'surprise': 'rgba(81, 179, 240, 1)',
+    'fear': 'rgba(31, 109, 46, 1)',
+    'disgust': 'rgba(121, 41, 156, 1)',
+    'angry': 'rgba(207, 14, 14, 1)',
+    'contempt': 'rgba(195, 160, 47, 1)'
+}
+
+border_colors_rgba = {
+    'neutral': 'rgba(90, 97, 105, 1)',
+    'happy': 'rgba(230, 180, 0, 1)',
+    'sad': 'rgba(8, 50, 140, 1)',
+    'surprise': 'rgba(45, 140, 200, 1)',
+    'fear': 'rgba(20, 80, 30, 1)',
+    'disgust': 'rgba(90, 25, 120, 1)',
+    'angry': 'rgba(160, 10, 10, 1)',
+    'contempt': 'rgba(150, 120, 30, 1)'
 }
 
 def init_server():
@@ -92,12 +121,23 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+def get_summarized_emotions(emotion_arrays):
+    summed_per_emotion = [np.sum(arr) for arr in emotion_arrays]
+    
+    grand_total = sum(summed_per_emotion)
+    
+    if grand_total == 0:
+        normalized_values = [0.0] * len(summed_per_emotion)
+    else:
+        normalized_values = [val / grand_total for val in summed_per_emotion]
+    
+    return normalized_values
 
-async def generate_plot(student_id: str = None, cumulative: bool = False):
-    """Generate stacked area chart showing emotion distribution"""
+async def generate_plot(is_cumulative: bool = False, is_summary: bool = False, fill: bool = True, student_id: str = None):
+    """Generate chart showing emotion distribution"""
     async with predictions_lock:
         if not predictions_log:
-            return None
+            return json.dumps({"labels": [], "datasets": []})
         
         if student_id:
             filtered_data = [(sid, ts, preds) for sid, ts, preds in predictions_log if sid == student_id]
@@ -105,7 +145,7 @@ async def generate_plot(student_id: str = None, cumulative: bool = False):
             filtered_data = predictions_log
         
         if not filtered_data:
-            return None
+            return json.dumps({"labels": [], "datasets": []})
         
         filtered_data.sort(key=lambda x: x[1])
         timestamps = [entry[1] for entry in filtered_data]
@@ -115,36 +155,45 @@ async def generate_plot(student_id: str = None, cumulative: bool = False):
         for _, _, predictions in filtered_data:
             for key in emotion_keys:
                 emotion_data[key].append(predictions.get(key, 0.0))
-        
+
         emotion_arrays = [np.array(emotion_data[key]) for key in emotion_keys]
-        if cumulative:
-            emotion_arrays = [np.cumsum(arr) for arr in emotion_arrays]
-        
-        fig, ax = plt.subplots(figsize=(12, 6))
-        time_indices = list(range(1, len(timestamps) + 1))
-        
-        color_list = [colors.get(key.lower(), '#CCCCCC') for key in emotion_keys]
-        
-        ax.stackplot(time_indices, *emotion_arrays, labels=emotion_keys, colors=color_list, alpha=0.8)
-        ax.set_xlabel('Reading index', fontsize=12)
-        ylabel = 'Cumulative Emotion Count' if cumulative else 'Emotion Probability'
-        ax.set_ylabel(ylabel, fontsize=12)
-        
-        title_suffix = f" - {student_id}" if student_id else " - All Students"
-        title_prefix = "Cumulative " if cumulative else ""
-        ax.set_title(f'{title_prefix}Emotion Distribution Over Readings{title_suffix}', fontsize=14, pad=20)
-        
-        if not cumulative:
-            ax.set_ylim(0, 1)
-        ax.grid(True, alpha=0.3, linestyle='--')
-        ax.legend(loc='upper left', bbox_to_anchor=(1.02, 1), framealpha=0.9, fontsize=10)
-        plt.tight_layout()
-        
-        buf = io.BytesIO()
-        plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
-        buf.seek(0)
-        plt.close(fig)
-        return buf
+
+        datasets = []
+        if is_summary:
+            summarized_values = get_summarized_emotions(emotion_arrays)
+            
+            labels = emotion_keys
+
+            datasets = [{
+                "label": emotion_keys,
+                "data": summarized_values,
+                "backgroundColor": [colors_rgba.get(k, "#808080") for k in emotion_keys],
+                "borderWidth": 2,
+            }]
+        else:
+            labels = [f"{i}" for i in range(len(emotion_arrays[0]))]        
+
+            if is_cumulative:
+                emotion_arrays = [np.cumsum(arr) for arr in emotion_arrays]
+                total_final = sum(arr[-1] for arr in emotion_arrays)
+                emotion_arrays = [arr / total_final for arr in emotion_arrays]
+                
+            for key, data_array in zip(emotion_keys, emotion_arrays):
+                datasets.append({
+                    "label": key,
+                    "data": data_array.tolist(),
+                    "backgroundColor": colors_rgba.get(key, "#808080"),
+                    "fill": fill,
+                    "borderWidth": 3,
+                    "borderColor": border_colors_rgba.get(key, "#808080")
+                })
+
+        chart_data = {
+            "labels": labels,
+            "datasets": datasets
+        }
+
+        return json.dumps(chart_data)
 
 
 @app.post("/api/emotions")
@@ -152,44 +201,87 @@ async def receive_emotions(request: Request):
     """Receive emotion predictions from clients"""
     try:
         data = await request.json()
+        student_id = data['id']
+        client_session_id = data.get('session_id', None)
+        
+        if client_session_id and client_session_id != session_id:
+            print(f"Rejected data from {student_id} - session expired")
+            return JSONResponse({
+                "status": "session_ended",
+                "message": "Class has ended. Please reconnect for the next session."
+            }, status_code=410)
+        
         timestamp = int(time.time())
         async with predictions_lock:
-            predictions_log.append((data['id'], timestamp, data['predictions']))
-        print(f"Received data from {data['id']} at {timestamp}")
-        return JSONResponse({"status": "ok"}, status_code=200)
+            predictions_log.append((student_id, timestamp, data['predictions']))
+            active_students[student_id] = timestamp
+        print(f"Received data from {student_id} at {timestamp}")
+        return JSONResponse({"status": "ok", "session_id": session_id}, status_code=200)
     except Exception as e:
         print("Error:", e)
         return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/session-id")
+async def get_session_id():
+    """Get current session ID"""
+    return {"session_id": session_id}
+
+
+@app.post("/api/reset-session")
+async def reset_session():
+    """Reset all collected data and prepare for a new class"""
+    global predictions_log, active_students, session_id
+    
+    async with predictions_lock:
+        predictions_log.clear()
+        active_students.clear()
+        session_id = str(uuid.uuid4())
+    
+    print(f"Session reset - all data cleared, new session ID: {session_id}")
+    return {
+        "status": "success",
+        "message": "All data cleared, ready for new class",
+        "new_session_id": session_id
+    }
 
 
 @app.get("/api/statistics")
 async def get_statistics():
     """Get overall statistics for dashboard"""
     async with predictions_lock:
+        now = time.time()
+
+        active_ids = [
+            sid for sid, last_seen in active_students.items()
+            if (now - last_seen) < USER_TIMEOUT
+        ]
+
         student_counts = defaultdict(int)
         for student_id, _, _ in predictions_log:
             student_counts[student_id] += 1
         return {
             "total_students": len(student_counts),
             "total_predictions": len(predictions_log),
-            "active_sessions": len(student_counts),
-            "students": dict(student_counts)
+            "active_sessions": len(active_ids),
+            "students": dict(student_counts),
+            "session_id": session_id
         }
 
 
 @app.get("/api/plot/{student_id}")
-async def get_student_plot(student_id: str, type: str = "regular"):
+async def get_student_plot(student_id: str, is_cumulative: bool = False, is_summary: bool = False, fill : bool = True):
     """Get emotion plot for specific student"""
-    plot_buffer = await generate_plot(student_id, cumulative=(type == "cumulative"))
+    plot_buffer = await generate_plot(is_cumulative, is_summary, fill, student_id)
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
     return StreamingResponse(plot_buffer, media_type="image/png")
 
 
 @app.get("/api/plot")
-async def get_all_students_plot(type: str = "regular"):
+async def get_all_students_plot(is_cumulative: bool = False, is_summary: bool = False, fill : bool = True):
     """Get emotion plot for all students"""
-    plot_buffer = await generate_plot(cumulative=(type == "cumulative"))
+    plot_buffer = await generate_plot(is_cumulative, is_summary, fill)
     if plot_buffer is None:
         return JSONResponse({"error": "No data available"}, status_code=404)
     return StreamingResponse(plot_buffer, media_type="image/png")
@@ -210,6 +302,8 @@ async def start_server_mode():
 @app.post("/api/start-client")
 async def start_client_mode(request: Request):
     """Start client mode"""
+    global CLIENT_THREAD, CLIENT_THREAD_RUNNING
+    
     data = await request.json()
     endpoint_url = data.get('url', '')
     show_camera = data.get('show_camera', False)
@@ -217,14 +311,36 @@ async def start_client_mode(request: Request):
     if not endpoint_url:
         return JSONResponse({"error": "URL is required"}, status_code=400)
     
-    # Start client in a separate thread
+    if CLIENT_THREAD and CLIENT_THREAD.is_alive():
+        return JSONResponse({"error": "Client already running"}, status_code=400)
+    
     def run_client_thread():
+        global CLIENT_THREAD_RUNNING
+        CLIENT_THREAD_RUNNING = True
         run_client(endpoint_url, show_camera)
     
-    thread = threading.Thread(target=run_client_thread, daemon=True)
-    thread.start()
+    CLIENT_THREAD = threading.Thread(target=run_client_thread, daemon=True)
+    CLIENT_THREAD.start()
     
     return {"status": "Client started", "url": endpoint_url}
+
+
+@app.post("/api/stop-client")
+async def stop_client_mode():
+    """Stop client mode"""
+    global CLIENT_THREAD_RUNNING
+    
+    if not CLIENT_THREAD or not CLIENT_THREAD.is_alive():
+        return JSONResponse({"error": "Client not running"}, status_code=400)
+    
+    CLIENT_THREAD_RUNNING = False
+    return {"status": "Client stopped"}
+
+
+@app.get("/api/client-status")
+async def get_client_status():
+    """Get client running status"""
+    return {"running": CLIENT_THREAD and CLIENT_THREAD.is_alive()}
 
 
 @app.get("/health")
@@ -326,16 +442,41 @@ def predict(frame, model, device='cpu'):
 
 
 def send_to_server(data, endpoint_url):
-    """Send predictions to server"""
+    """Send predictions to server and check session validity"""
     try:
         r = requests.post(urljoin(endpoint_url, "api/emotions"), json=data, timeout=5)
-        print(f"Sent: {r.status_code}")
+        
+        if r.status_code == 410:
+            return False
+        elif r.status_code == 200:
+            response_data = r.json()
+            print(f"Sent: {r.status_code}")
+            if 'session_id' in response_data:
+                data['session_id'] = response_data['session_id']
+            return True
+        else:
+            print(f"Sent: {r.status_code}")
+            return True
     except Exception as e:
         print(f"Error sending: {e}")
+        return True
+
+
+def get_session_id(endpoint_url):
+    """Get current session ID from server"""
+    try:
+        r = requests.get(urljoin(endpoint_url, "api/session-id"), timeout=5)
+        if r.status_code == 200:
+            return r.json().get('session_id')
+    except Exception as e:
+        print(f"Warning: Could not get session ID: {e}")
+    return None
 
 
 def run_client(endpoint_url, show_camera=False):
     """Run emotion detection client"""
+    global CLIENT_THREAD_RUNNING
+    
     print("\n" + "="*60)
     print("  STARTING CLIENT MODE")
     print("="*60)
@@ -382,13 +523,16 @@ def run_client(endpoint_url, show_camera=False):
         print("Camera view enabled. Press 'q' in the camera window to close it.")
     
     print(f"\nCamera running. Sending predictions every {CAPTURE_INTERVAL}s to {endpoint_url}")
-    print("Press Ctrl+C to stop\n")
+    print("Click 'Stop Client' to stop\n")
+    
+    current_session_id = get_session_id(endpoint_url)
     
     last_capture_time = time.time()
     GUID = uuid.uuid4()
+    session_ended = False
     
     try:
-        while True:
+        while CLIENT_THREAD_RUNNING and not session_ended:
             ret, frame = cap.read()
             if not ret:
                 print("Warning: Could not read frame")
@@ -401,18 +545,35 @@ def run_client(endpoint_url, show_camera=False):
             if current_time - last_capture_time >= CAPTURE_INTERVAL:
                 preds = predict(frame, model, device)
                 print(f"Predictions: {preds}")
-                data = {"id": str(GUID), "predictions": preds}
-                send_to_server(data, endpoint_url)
+                data = {
+                    "id": str(GUID),
+                    "predictions": preds,
+                    "session_id": current_session_id
+                }
+                
+                continue_sending = send_to_server(data, endpoint_url)
+                if not continue_sending:
+                    session_ended = True
+                    break
+                    
                 last_capture_time = current_time
             
             if show_camera:
                 for (x, y, w, h) in face:
-                    cv2.rectangle(frame, (x - FACE_EXTENSION_X, y - FACE_EXTENSION_Y), (x + w + FACE_EXTENSION_X, y + h + FACE_EXTENSION_Y), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x - FACE_EXTENSION_X, y - FACE_EXTENSION_Y), 
+                                (x + w + FACE_EXTENSION_X, y + h + FACE_EXTENSION_Y), (0, 255, 0), 2)
                 frame = cv2.flip(frame, 1)
-                status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
-                display_frame = cv2.resize(frame, (640, 480))
+                
+                if session_ended:
+                    status_text = "SESSION ENDED - Disconnected"
+                    color = (0, 0, 255)  # Red
+                else:
+                    status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
+                    color = (0, 255, 0)  # Green
+                    
+                display_frame = cv2.resize(frame, (640, 480))   
                 cv2.putText(display_frame, status_text, (10, 30),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                 cv2.imshow("Real-Time Camera View (Press 'q' to stop)", display_frame)
                 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -423,11 +584,16 @@ def run_client(endpoint_url, show_camera=False):
     except KeyboardInterrupt:
         print("\nStopping...")
     finally:
+        CLIENT_THREAD_RUNNING = False
         cap.release()
-        if show_camera:
-            cv2.destroyAllWindows()
-        print("Camera released. Goodbye!")
+        try:
+            if show_camera:
+                cv2.destroyAllWindows()
+                cv2.waitKey(1)
+        except:
+            pass
 
+        
 
 # ============================================================================
 # TRAIN CODE

@@ -29,9 +29,14 @@
             padding: 30px;
             margin-bottom: 20px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
         }
 
-        h1 {
+        .header-content h1 {
             color: #333;
             font-size: 32px;
             margin-bottom: 10px;
@@ -40,6 +45,43 @@
         .subtitle {
             color: #666;
             font-size: 16px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .reset-button {
+            padding: 12px 24px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .reset-button:hover {
+            background: #c82333;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+        }
+
+        .reset-button:active {
+            transform: translateY(0);
+        }
+
+        .reset-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .stats-grid {
@@ -257,14 +299,143 @@
         .back-button:active {
             transform: translateY(0);
         }
+
+        input[list] {
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            background: white;
+            cursor: pointer;
+            transition: border-color 0.2s;
+            min-width: 200px;
+        }
+
+        input[list]:hover {
+            border-color: #667eea;
+        }
+
+        input[list]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        input[list]::placeholder {
+            color: #999;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .modal-body {
+            color: #666;
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .modal-button-cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .modal-button-cancel:hover {
+            background: #e0e0e0;
+        }
+
+        .modal-button-confirm {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-button-confirm:hover {
+            background: #c82333;
+        }
+
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+            animation: fadeIn 0.3s;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 Emotion Monitoring Dashboard</h1>
-            <p class="subtitle">Real-time emotion distribution tracking for students</p>
+            <div class="header-content">
+                <h1>📊 Emotion Monitoring Dashboard</h1>
+                <p class="subtitle">Real-time emotion distribution tracking for students</p>
+            </div>
+            <div class="header-actions">
+                <button class="reset-button" onclick="showResetConfirmation()">
+                    <span>End Class & Reset</span>
+                </button>
+            </div>
         </div>
+
+        <div class="success-message" id="successMessage"></div>
 
         <div class="stats-grid">
             <div class="stat-card">
@@ -288,17 +459,24 @@
                     <select id="studentSelect">
                         <option value="">All Students</option>
                     </select>
+                    <select id="chartTypeSelect">
+                        <option value="area">Area</option>
+                        <option value="pie">Pie</option>
+                        <option value="line">Line</option>
+                        <option value="polarArea">Polar</option>
+                    </select>
                     <select id="graphTypeSelect">
                         <option value="regular">Regular</option>
                         <option value="cumulative">Cumulative</option>
                     </select>
-                        <button onclick="refreshPlot()">🔄 Refresh</button>
-                        <span id="smallLoader" class="refresh-indicator" style="display:none; margin-left:8px;"></span>
+                    <button onclick="refreshPlot()">🔄 Refresh</button>
+                    <span id="smallLoader" class="refresh-indicator" style="display:none; margin-left:8px;"></span>
                 </div>
             </div>
             
-            <img id="emotionPlot" class="plot-image" alt="Emotion Distribution Chart">
-            <div class="loading" id="loadingIndicator">Loading data...</div>
+            <div class="plot-image">
+                <canvas id="emotionChart"></canvas>
+            </div>
             <div class="error" id="errorMessage"></div>
             
             <div class="last-update">
@@ -318,74 +496,210 @@
         </button>
     </div>
 
+    <div id="resetModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">⚠️ End Class & Reset Data?</div>
+            <div class="modal-body">
+                <p>This will:</p>
+                <ul style="margin: 15px 0 15px 20px; line-height: 1.8;">
+                    <li>Clear all collected emotion data</li>
+                    <li>Remove all student records</li>
+                    <li>Reset statistics to zero</li>
+                    <li>Prepare the system for a new class</li>
+                </ul>
+                <p><strong>Note:</strong> Currently connected students will need to reconnect for the next class.</p>
+                <p style="margin-top: 15px; color: #dc3545;"><strong>This action cannot be undone!</strong></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-button modal-button-cancel" onclick="closeResetModal()">Cancel</button>
+                <button class="modal-button modal-button-confirm" onclick="confirmReset()">Yes, Reset Everything</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = window.location.origin;
         let autoRefreshInterval;
-        const REFRESH_INTERVAL = 10000; // 10 seconds
+        const REFRESH_INTERVAL = 10000;
 
-        // Initialize
         document.addEventListener('DOMContentLoaded', () => {
             refreshPlot();
             fetchStatistics();
             startAutoRefresh();
             
-            // Student select change handler
             document.getElementById('studentSelect').addEventListener('change', (e) => {
                 refreshPlot();
             });
 
-            // Graph type select change handler
+            document.getElementById('chartTypeSelect').addEventListener('change', (e) => {
+                refreshPlot();
+            });
+
             document.getElementById('graphTypeSelect').addEventListener('change', (e) => {
                 refreshPlot();
             });
         });
 
+        let emotionChartInstance = null;
+        let currentChartType = null;
+        let summaryChartTypes = ["pie", "polarArea"];
+        let chartConfigs = {
+            area: {
+                type: 'line',
+                options: {
+                    scales: {
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            max: 1.0,
+                            title: {
+                                display: true,
+                                text: 'Probability',
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        },
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Emotion Data Readings',
+                                font: {
+                                    size: 20,
+                                    weight: 'bold'
+                                },
+                                padding: {top: 10, bottom: 0}
+                            }
+                        }
+                    },
+                    plugins: {
+                        filler: {
+                            propagate: true
+                        }
+                    }
+                }
+            },
+            line: {
+                type: 'line',
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1.0,
+                            title: {
+                                display: true,
+                                text: 'Probability'
+                            }                            
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Emotion Data Readings',
+                                font: {
+                                    size: 16,
+                                    weight: 'bold'
+                                },
+                                padding: {top: 10, bottom: 0}
+                            }
+                        }                        
+                    }
+                },
+                datasetOptions: {
+                    fill: false,
+                    tension: 0.4
+                }
+            },
+            pie: {
+                type: 'pie',
+                options: {
+                    scales: {
+                        x: {
+                            display: false
+                        },
+                        y: {
+                            display: false
+                        }
+                    }                    
+                },
+                datasetOptions: {}
+            },
+            polarArea: {
+                type: 'polarArea',
+                options: {
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: {
+                                display: false
+                            }
+                        }
+                    }
+                },
+                datasetOptions: {}
+            }
+        };
+
+        let currentFetchController = null;
+
         async function refreshPlot() {
-            const plotImg = document.getElementById('emotionPlot');
-            const loading = document.getElementById('loadingIndicator');
+            if (currentFetchController) {
+                currentFetchController.abort();
+            }
+    
+            currentFetchController = new AbortController();
+
             const errorDiv = document.getElementById('errorMessage');
             const studentId = document.getElementById('studentSelect').value;
             const graphType = document.getElementById('graphTypeSelect').value;
-            const smallLoader = document.getElementById('smallLoader');
+
+            const chartType = document.getElementById('chartTypeSelect').value;
             
-            //loading.style.display = 'block';
-            //plotImg.style.display = 'none';
-            //errorDiv.style.display = 'none';
-            
-                try {
-                    const url = (studentId 
-                        ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
-                        : `${API_BASE}/api/plot?t=${Date.now()}`)
-                        + `&type=${graphType}`;
+            errorDiv.style.display = 'none';
 
-                    // Show small loader while new image is loading, keep old image visible
-                    smallLoader.style.display = 'inline-block';
+            const url = (studentId 
+                ? `${API_BASE}/api/plot/${studentId}?t=${Date.now()}`
+                : `${API_BASE}/api/plot?t=${Date.now()}`)
+                + `&is_cumulative=${graphType == 'cumulative'}`
+                + `&is_summary=${summaryChartTypes.includes(chartType)}`
+                + `&fill=${chartType!='line'}`;
 
-                    // Load new image in background
-                    const loader = new Image();
-                    loader.onload = () => {
-                        // Swap in the newly loaded image
-                        plotImg.src = url;
-                        plotImg.style.display = 'block';
-                        loading.style.display = 'none';
-                        smallLoader.style.display = 'none';
-                        errorDiv.style.display = 'none';
-                        updateLastUpdateTime();
-                    };
-                    loader.onerror = () => {
-                        smallLoader.style.display = 'none';
-                        loading.style.display = 'none';
-                        errorDiv.textContent = `Error loading plot`;
-                        errorDiv.style.display = 'block';
-                    };
+            try {
+                const response = await fetch(url, { signal: currentFetchController.signal });
+                const data = await response.json();
 
-                    // Trigger load (browser will fetch the image)
-                    loader.src = url;
-                } catch (error) {
-                    loading.style.display = 'none';
-                    errorDiv.textContent = `Error loading plot: ${error.message}`;
-                    errorDiv.style.display = 'block';
+                if (emotionChartInstance && currentChartType !== chartType) {
+                    emotionChartInstance.destroy();
+                    emotionChartInstance = null;
                 }
+
+                if (!emotionChartInstance) {
+                    const ctx = document.getElementById('emotionChart').getContext('2d');
+                    currentChartType = chartType;
+                    const config = chartConfigs[currentChartType] || chartConfigs.line;
+                    emotionChartInstance = new Chart(ctx, {
+                        type: config.type, 
+                        data: data,
+                        options: config.options
+                    });
+                } else {
+                    emotionChartInstance.data.labels = data.labels;
+                    emotionChartInstance.data.datasets = data.datasets; 
+                    emotionChartInstance.update('none');
+                }
+                updateLastUpdateTime();
+
+            } catch (error) {
+                if (error.name == 'AbortError') {
+                    return;
+                }
+                errorDiv.textContent = `Error loading plot: ${error.message}`;
+                errorDiv.style.display = 'block';
+                if (emotionChartInstance) {
+                    emotionChartInstance.destroy();
+                    emotionChartInstance = null;
+                }
+            }
         }
 
         async function fetchStatistics() {
@@ -393,12 +707,10 @@
                 const response = await fetch(`${API_BASE}/api/statistics`);
                 const data = await response.json();
                 
-                // Update stats
                 document.getElementById('totalStudents').textContent = data.total_students || 0;
                 document.getElementById('totalPredictions').textContent = data.total_predictions || 0;
                 document.getElementById('activeSessions').textContent = data.active_sessions || 0;
                 
-                // Update student dropdown and list
                 updateStudentsList(data.students || {});
             } catch (error) {
                 console.error('Error fetching statistics:', error);
@@ -409,11 +721,9 @@
             const select = document.getElementById('studentSelect');
             const listDiv = document.getElementById('studentsList');
             
-            // Keep "All Students" option
             const currentValue = select.value;
             select.innerHTML = '<option value="">All Students</option>';
             
-            // Clear list
             listDiv.innerHTML = '';
             
             if (Object.keys(students).length === 0) {
@@ -421,15 +731,12 @@
                 return;
             }
             
-            // Add students
             Object.entries(students).forEach(([studentId, count]) => {
-                // Add to dropdown
                 const option = document.createElement('option');
                 option.value = studentId;
                 option.textContent = studentId;
                 select.appendChild(option);
                 
-                // Add to list
                 const item = document.createElement('div');
                 item.className = 'student-item';
                 item.innerHTML = `
@@ -439,7 +746,6 @@
                 listDiv.appendChild(item);
             });
             
-            // Restore selection
             select.value = currentValue;
         }
 
@@ -461,7 +767,63 @@
             }
         }
 
-        // Cleanup on page unload
+        function showResetConfirmation() {  
+            document.getElementById('resetModal').style.display = 'block';
+        }
+
+        function closeResetModal() {
+            document.getElementById('resetModal').style.display = 'none';
+        }
+
+        async function confirmReset() {
+            const resetButton = document.querySelector('.reset-button');
+            const successMessage = document.getElementById('successMessage');
+            
+            resetButton.disabled = true;
+            resetButton.innerHTML = '<span>⏳</span><span>Resetting...</span>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/reset-session`, {
+                    method: 'POST'
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    closeResetModal();
+                    
+                    successMessage.textContent = '✅ Class ended successfully! All data cleared and ready for a new class.';
+                    successMessage.style.display = 'block';
+                    
+                    setTimeout(() => {
+                        successMessage.style.display = 'none';
+                    }, 5000);
+                    
+                    if (emotionChartInstance) {
+                        emotionChartInstance.destroy();
+                        emotionChartInstance = null;
+                    }
+                    
+                    await fetchStatistics();
+                    await refreshPlot();
+                } else {
+                    alert('Error resetting session: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error resetting session: ' + error.message);
+            } finally {
+                resetButton.disabled = false;
+                resetButton.innerHTML = '<span>End Class & Reset</span>';
+            }
+        }
+
+        window.onclick = function(event) {
+            const modal = document.getElementById('resetModal');
+            if (event.target == modal) {
+                closeResetModal();
+            }
+        }
+
         window.addEventListener('beforeunload', stopAutoRefresh);
     </script>
 </body>

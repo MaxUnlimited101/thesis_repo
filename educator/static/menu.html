@@ -229,6 +229,11 @@
             transform: scale(0.98);
         }
 
+        .modal-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         .tunnel-url-display {
             background: #f5f5f5;
             padding: 15px;
@@ -301,6 +306,12 @@
             display: block;
         }
 
+        .status-message.warning {
+            background: #fff3cd;
+            color: #856404;
+            display: block;
+        }
+
         .loading-spinner {
             display: inline-block;
             width: 20px;
@@ -331,6 +342,38 @@
 
         .authors-corner div {
             margin: 2px 0;
+        }
+
+        .client-status-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+        }
+
+        .status-dot.active {
+            background: #4CAF50;
+            animation: pulse-dot 2s infinite;
+        }
+
+        .status-dot.disconnected {
+            background: #dc3545;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
     </style>
 </head>
@@ -431,9 +474,12 @@
             <div class="status-message" id="clientStatus"></div>
 
             <div class="modal-buttons">
-                <button class="modal-button secondary" onclick="closeClientModal()">Cancel</button>
+                <button class="modal-button secondary" onclick="handleClientCancel()" id="cancelClientBtn">Cancel</button>
                 <button class="modal-button primary" onclick="startClient()" id="startClientBtn">
                     Connect Camera
+                </button>
+                <button class="modal-button secondary" onclick="stopClient()" id="stopClientBtn" style="display: none; background: #dc3545;">
+                    Stop Client
                 </button>
             </div>
         </div>
@@ -496,7 +542,7 @@
 
             <label>Version: 1.1.3</label>
             <label style="margin-top: 10px;">Made as part of Bachelor Thesis for Warsaw University of Technology</label>
-            <label style="margin-top: 10px;">Special thanks to our advisor dr. hab. inż. Jerzy Balicki</label>
+            <label style="margin-top: 10px;">Special thanks to our advisor dr. hab. inż. Jerzy Balicki, prof. ucz.</label>
 
 
             <div class="modal-buttons">
@@ -507,8 +553,8 @@
         </div>
     </div>
     <div class="authors-corner">
-                <label>Authors:</label>
-                <div style="margin-top: 10px; color: #666;">
+                <label style="font-size: 18px">Authors:</label>
+                <div style="margin-top: 10px; color: #666; font-size: 30px;">
                     • Maksym Nosal<br>
                     • Maciej Sosnowski<br>
                     • Oleksandr Shkil<br>
@@ -518,6 +564,7 @@
 
     <script>
         const API_BASE = window.location.origin;
+        let clientStatusCheckInterval = null;
 
         async function checkServerStatus() {
             try {
@@ -551,17 +598,92 @@
             document.getElementById('serverModal').classList.add('active');
             checkServerStatus();
         }
-
+        
         function closeServerModal() {
             document.getElementById('serverModal').classList.remove('active');
         }
 
-        function showClientModal() {
+        async function showClientModal() {
             document.getElementById('clientModal').classList.add('active');
+            document.getElementById('serverUrl').select();
+            const statusDiv = document.getElementById('clientStatus');
+            const startBtn = document.getElementById('startClientBtn');
+
+            statusDiv.textContent = "";
+            statusDiv.style.display = "none";
+            startBtn.style.display = "";
+            startBtn.disabled = false;
+            startBtn.textContent = 'Connect Camera';
         }
 
         function closeClientModal() {
             document.getElementById('clientModal').classList.remove('active');
+            stopClientStatusMonitoring();
+        }
+
+        async function handleClientCancel() {
+            const isRunning = await checkClientStatus();
+            if (isRunning) {
+                if (confirm('Client is currently running. Do you want to stop it?')) {
+                    await stopClient();
+                }
+            }
+            closeClientModal();
+        }
+
+        async function checkClientStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/api/client-status`);
+                const data = await response.json();
+                return data.running;
+            } catch (error) {
+                return false;
+            }
+        }
+checkClientStatus
+        async function updateClientStatus() {
+            const isRunning = await checkClientStatus();
+            console.log("Client Status from API:", isRunning);
+            // const indicator = document.getElementById('clientStatusIndicator');
+            // const dot = document.getElementById('statusDot');
+            // const text = document.getElementById('statusText');
+            const statusDiv = document.getElementById('clientStatus');
+            const startBtn = document.getElementById('startClientBtn');
+            const stopBtn = document.getElementById('stopClientBtn');
+            const cancelBtn = document.getElementById('cancelClientBtn');
+
+            // indicator.style.display = 'inline-flex';
+
+            if (isRunning) {
+                // dot.className = 'status-dot active';
+                // text.textContent = 'Connected and sending data';
+                console.log("isRunning");
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'block';    
+                cancelBtn.textContent = 'Close';
+            } else {
+                // dot.className = 'status-dot';
+                // text.textContent = 'Not connected';
+                console.log("isNot");
+                statusDiv.textContent = "Class have ended. You have been disconnected."
+                startBtn.style.display = 'none';
+                stopBtn.style.display = 'none';
+                cancelBtn.textContent = 'Close';
+                stopClientStatusMonitoring();
+            }
+        }
+
+        function startClientStatusMonitoring() {
+            clientStatusCheckInterval = setInterval(async () => {
+                await updateClientStatus();
+            }, 2000);
+        }
+
+        function stopClientStatusMonitoring() {
+            if (clientStatusCheckInterval) {
+                clearInterval(clientStatusCheckInterval);
+                clientStatusCheckInterval = null;
+            }
         }
 
         function showTrainModal() {
@@ -609,6 +731,8 @@
             const showCamera = document.getElementById('showCamera').checked;
             const statusDiv = document.getElementById('clientStatus');
             const startBtn = document.getElementById('startClientBtn');
+            const stopBtn = document.getElementById('stopClientBtn');
+            const cancelBtn = document.getElementById('cancelClientBtn');
 
             if (!url) {
                 statusDiv.className = 'status-message error';
@@ -632,8 +756,11 @@
 
                 if (response.ok) {
                     statusDiv.className = 'status-message success';
-                    statusDiv.textContent = '✓ Camera started! To stop the connection press Cancel.';
-                    startBtn.textContent = 'Connected';
+                    statusDiv.textContent = '✓ Camera started!';
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'block';
+                    cancelBtn.textContent = 'Close';
+                    startClientStatusMonitoring(); 
                 } else {
                     statusDiv.className = 'status-message error';
                     statusDiv.textContent = 'Error: ' + (data.error || 'Failed to start client');
@@ -648,9 +775,45 @@
             }
         }
 
+        async function stopClient() {
+            const statusDiv = document.getElementById('clientStatus');
+            const stopBtn = document.getElementById('stopClientBtn');
+
+            stopBtn.disabled = true;
+            stopBtn.innerHTML = 'Stopping... <span class="loading-spinner"></span>';
+
+            try {
+                const response = await fetch(`${API_BASE}/api/stop-client`, {
+                    method: 'POST'
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    statusDiv.className = 'status-message success';
+                    statusDiv.textContent = '✓ Client stopped successfully';
+                    await updateClientStatus();
+                } else {
+                    statusDiv.className = 'status-message error';
+                    statusDiv.textContent = 'Error: ' + (data.error || 'Failed to stop client');
+                    stopBtn.disabled = false;
+                    stopBtn.textContent = 'Stop Client';
+                }
+            } catch (error) {
+                statusDiv.className = 'status-message error';
+                statusDiv.textContent = 'Stop error: ' + error.message;
+                stopBtn.disabled = false;
+                stopBtn.textContent = 'Stop Client';
+            }
+        }
+
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
-                event.target.classList.remove('active');
+                if (event.target.id === 'clientModal') {
+                    handleClientCancel();
+                } else {
+                    event.target.classList.remove('active');
+                }
             }
         }
 
