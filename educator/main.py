@@ -49,6 +49,7 @@ USER_TIMEOUT = 10
 predictions_log = []
 active_students = dict()
 predictions_lock = Lock()
+session_id = str(uuid.uuid4())  # Track current session
 
 colors = {
     'neutral': "#808991", 'happy': "#FFF700", 'sad': "#0B4CB3",
@@ -201,15 +202,48 @@ async def receive_emotions(request: Request):
     try:
         data = await request.json()
         student_id = data['id']
+        client_session_id = data.get('session_id', None)
+        
+        if client_session_id and client_session_id != session_id:
+            print(f"Rejected data from {student_id} - session expired")
+            return JSONResponse({
+                "status": "session_ended",
+                "message": "Class has ended. Please reconnect for the next session."
+            }, status_code=410)
+        
         timestamp = int(time.time())
         async with predictions_lock:
             predictions_log.append((student_id, timestamp, data['predictions']))
             active_students[student_id] = timestamp
         print(f"Received data from {student_id} at {timestamp}")
-        return JSONResponse({"status": "ok"}, status_code=200)
+        return JSONResponse({"status": "ok", "session_id": session_id}, status_code=200)
     except Exception as e:
         print("Error:", e)
         return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/session-id")
+async def get_session_id():
+    """Get current session ID"""
+    return {"session_id": session_id}
+
+
+@app.post("/api/reset-session")
+async def reset_session():
+    """Reset all collected data and prepare for a new class"""
+    global predictions_log, active_students, session_id
+    
+    async with predictions_lock:
+        predictions_log.clear()
+        active_students.clear()
+        session_id = str(uuid.uuid4())
+    
+    print(f"Session reset - all data cleared, new session ID: {session_id}")
+    return {
+        "status": "success",
+        "message": "All data cleared, ready for new class",
+        "new_session_id": session_id
+    }
 
 
 @app.get("/api/statistics")
@@ -230,7 +264,8 @@ async def get_statistics():
             "total_students": len(student_counts),
             "total_predictions": len(predictions_log),
             "active_sessions": len(active_ids),
-            "students": dict(student_counts)
+            "students": dict(student_counts),
+            "session_id": session_id
         }
 
 
@@ -279,7 +314,6 @@ async def start_client_mode(request: Request):
     if CLIENT_THREAD and CLIENT_THREAD.is_alive():
         return JSONResponse({"error": "Client already running"}, status_code=400)
     
-    # Start client in a separate thread
     def run_client_thread():
         global CLIENT_THREAD_RUNNING
         CLIENT_THREAD_RUNNING = True
@@ -408,16 +442,40 @@ def predict(frame, model, device='cpu'):
 
 
 def send_to_server(data, endpoint_url):
-    """Send predictions to server"""
+    """Send predictions to server and check session validity"""
     try:
         r = requests.post(urljoin(endpoint_url, "api/emotions"), json=data, timeout=5)
-        print(f"Sent: {r.status_code}")
+        
+        if r.status_code == 410:
+            return False
+        elif r.status_code == 200:
+            response_data = r.json()
+            print(f"Sent: {r.status_code}")
+            if 'session_id' in response_data:
+                data['session_id'] = response_data['session_id']
+            return True
+        else:
+            print(f"Sent: {r.status_code}")
+            return True
     except Exception as e:
         print(f"Error sending: {e}")
+        return True
+
+
+def get_session_id(endpoint_url):
+    """Get current session ID from server"""
+    try:
+        r = requests.get(urljoin(endpoint_url, "api/session-id"), timeout=5)
+        if r.status_code == 200:
+            return r.json().get('session_id')
+    except Exception as e:
+        print(f"Warning: Could not get session ID: {e}")
+    return None
 
 
 def run_client(endpoint_url, show_camera=False):
     """Run emotion detection client"""
+    global CLIENT_THREAD_RUNNING
     
     print("\n" + "="*60)
     print("  STARTING CLIENT MODE")
@@ -467,11 +525,14 @@ def run_client(endpoint_url, show_camera=False):
     print(f"\nCamera running. Sending predictions every {CAPTURE_INTERVAL}s to {endpoint_url}")
     print("Click 'Stop Client' to stop\n")
     
+    current_session_id = get_session_id(endpoint_url)
+    
     last_capture_time = time.time()
     GUID = uuid.uuid4()
+    session_ended = False
     
     try:
-        while CLIENT_THREAD_RUNNING:
+        while CLIENT_THREAD_RUNNING and not session_ended:
             ret, frame = cap.read()
             if not ret:
                 print("Warning: Could not read frame")
@@ -484,18 +545,35 @@ def run_client(endpoint_url, show_camera=False):
             if current_time - last_capture_time >= CAPTURE_INTERVAL:
                 preds = predict(frame, model, device)
                 print(f"Predictions: {preds}")
-                data = {"id": str(GUID), "predictions": preds}
-                send_to_server(data, endpoint_url)
+                data = {
+                    "id": str(GUID),
+                    "predictions": preds,
+                    "session_id": current_session_id
+                }
+                
+                continue_sending = send_to_server(data, endpoint_url)
+                if not continue_sending:
+                    session_ended = True
+                    break
+                    
                 last_capture_time = current_time
             
             if show_camera:
                 for (x, y, w, h) in face:
-                    cv2.rectangle(frame, (x - FACE_EXTENSION_X, y - FACE_EXTENSION_Y), (x + w + FACE_EXTENSION_X, y + h + FACE_EXTENSION_Y), (0, 255, 0), 2)
+                    cv2.rectangle(frame, (x - FACE_EXTENSION_X, y - FACE_EXTENSION_Y), 
+                                (x + w + FACE_EXTENSION_X, y + h + FACE_EXTENSION_Y), (0, 255, 0), 2)
                 frame = cv2.flip(frame, 1)
-                status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
+                
+                if session_ended:
+                    status_text = "SESSION ENDED - Disconnected"
+                    color = (0, 0, 255)  # Red
+                else:
+                    status_text = f"Preds Sent: {int(current_time - last_capture_time)}s ago"
+                    color = (0, 255, 0)  # Green
+                    
                 display_frame = cv2.resize(frame, (640, 480))   
                 cv2.putText(display_frame, status_text, (10, 30),
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                 cv2.imshow("Real-Time Camera View (Press 'q' to stop)", display_frame)
                 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -506,11 +584,16 @@ def run_client(endpoint_url, show_camera=False):
     except KeyboardInterrupt:
         print("\nStopping...")
     finally:
+        CLIENT_THREAD_RUNNING = False
         cap.release()
-        if show_camera:
-            cv2.destroyAllWindows()
-        print("Camera released. Goodbye!")
+        try:
+            if show_camera:
+                cv2.destroyAllWindows()
+                cv2.waitKey(1)
+        except:
+            pass
 
+        
 
 # ============================================================================
 # TRAIN CODE
